@@ -16,7 +16,7 @@ strand_refalt = "/data/rmccoy22/natera_spectrum/data/illumina_files/humancytosnp
 cytosnp_map_v12 = (
     "/data/rmccoy22/natera_spectrum/data/illumina_files/snp_map_cyto12b_f004.txt"
 )
-lrrs=["none"]
+lrrs = ["none"]
 
 # Create the VCF data dictionary for each chromosome ...
 vcf_dict = {}
@@ -87,13 +87,17 @@ if Path("results/valid_disomy_trios.txt").is_file():
         for i, line in enumerate(fp):
             [m, f, c] = line.rstrip().split()
             for l in lrrs:
-                total_data.append(f"results/natera_inference/{m}+{f}/{c}.{l}.total.posterior.tsv.gz")
+                total_data.append(
+                    f"results/natera_inference/{m}+{f}/{c}.{l}.total.posterior.tsv.gz"
+                )
 
 # ------- Rules Section ------- #
+
 
 localrules:
     all,
     hmm_model_chromosomes,
+
 
 rule all:
     input:
@@ -137,7 +141,7 @@ rule obtain_valid_trios:
 
 rule filter_to_disomic_trios:
     input:
-        disomic_embryos = ""
+        disomic_embryos="",
 
 
 rule preprocess_baf_data:
@@ -156,7 +160,7 @@ rule preprocess_baf_data:
     * Assign BAF to be reflective of the alternative allele frequency in the parental VCF (accounting for the complement strand)
 
     * Filter out positions where either parent has a missing genotype
-    
+
     The specific steps can be found in `preprocess_natera.py` in greater detail with code examples as well.
     """
     input:
@@ -168,16 +172,23 @@ rule preprocess_baf_data:
         vcf_file=[vcf_dict[c] for c in chroms],
         child_data=lambda wildcards: find_child_data(wildcards.child_id)[0],
     output:
-        baf_npz=expand("results/natera_inference/{{mother_id}}+{{father_id}}/{{child_id}}.{chrom}.bafs.npz", chrom=chroms)
+        baf_npz=expand(
+            "results/natera_inference/{{mother_id}}+{{father_id}}/{{child_id}}.{chrom}.bafs.npz",
+            chrom=chroms,
+        ),
     resources:
         time="2:00:00",
         mem_mb="5G",
     wildcard_constraints:
         chrom="|".join(chroms),
     run:
-        shell("mkdir -p results/natera_inference/{wildcards.mother_id}+{wildcards.father_id}/")
-        for v,o in zip(input.vcf_file, output.baf_npz):
-            shell("python3 scripts/preprocess_natera.py --child_csv {input.child_data} --cytosnp_map {input.cytosnp_map} --alleles_file {input.alleles_file} --cytosnp_cluster {input.egt_cluster}  --mother_id {wildcards.mother_id} --father_id {wildcards.father_id} --vcf_file {v} --meanr {input.meanr_file} --outfile {o}")
+        shell(
+            "mkdir -p results/natera_inference/{wildcards.mother_id}+{wildcards.father_id}/"
+        )
+        for v, o in zip(input.vcf_file, output.baf_npz):
+            shell(
+                "python3 scripts/preprocess_natera.py --child_csv {input.child_data} --cytosnp_map {input.cytosnp_map} --alleles_file {input.alleles_file} --cytosnp_cluster {input.egt_cluster}  --mother_id {wildcards.mother_id} --father_id {wildcards.father_id} --vcf_file {v} --meanr {input.meanr_file} --outfile {o}"
+            )
 
 
 rule hmm_model_comparison:
@@ -193,14 +204,14 @@ rule hmm_model_comparison:
             chrom=chroms,
         ),
     wildcard_constraints:
-        lrr="(none|raw|norm)"
+        lrr="(none|raw|norm)",
     resources:
         time="1:00:00",
         mem_mb="4G",
     params:
         unphased=False,
         eps=-6,
-        lrr = lambda wildcards: f"{wildcards.lrr}",
+        lrr=lambda wildcards: f"{wildcards.lrr}",
         mother_id=lambda wildcards: f"{wildcards.mother_id}",
         father_id=lambda wildcards: f"{wildcards.father_id}",
         child_id=lambda wildcards: f"{wildcards.child_id}",
@@ -221,10 +232,10 @@ rule hmm_model_chromosomes:
         time="0:10:00",
         mem_mb="1G",
     params:
-        lrr=lambda wildcards: wildcards.lrr != "none"
+        lrr=lambda wildcards: wildcards.lrr != "none",
     run:
         with open(output.ploidy, "w") as out:
-            if not params['lrr']:
+            if not params["lrr"]:
                 out.write(
                     "mother\tfather\tchild\tchrom\tsigma_baf\tpi0_baf\tpi0_lrr\tlrr_mu\tlrr_sd\t0\t1m\t1p\t2\t3m\t3p\n"
                 )
@@ -246,9 +257,9 @@ rule hmm_model_chromosomes:
 
 rule generate_posterior_table:
     """Generates a full TSV with posterior probabilities for each embryo across ploidy states.
-    
+
     The columns of the TSV contain the specific karyotypes like 0, 1m, 1p, 2m, 2p, 2, 3m, 3p.
-    
+
     Each row corresponds to a specific SNP position.
     """
     input:
@@ -267,7 +278,7 @@ rule generate_posterior_table:
         time="0:30:00",
         mem_mb="1G",
     wildcard_constraints:
-        lrr="(none|raw|norm)"
+        lrr="(none|raw|norm)",
     run:
         tot_dfs = []
         for c, fp, baf in tqdm(zip(chroms, input.hmm_models, input.baf_data)):
