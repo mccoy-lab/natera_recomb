@@ -1,7 +1,7 @@
 import sys
 
 import numpy as np
-from hmm import EuploidyHMM
+from karyohmm import EuploidyHMM
 
 if __name__ == "__main__":
     # Setup the HMM class ...
@@ -28,16 +28,13 @@ if __name__ == "__main__":
     res_dict["aploid"] = baf_data["aploid"]
     res_dict["nsibs"] = baf_data["nsibs"]
     for i in range(baf_data["nsibs"]):
-        print(i)
-        opt_res = hmm.est_sigma_pi0(
+        pi0_est, sigma_est = hmm.est_sigma_pi0(
             bafs=baf_data[f"baf_embryo{i}"],
             mat_haps=mat_haps,
             pat_haps=pat_haps,
             eps=eps,
             r=r,
         )
-        pi0_est = opt_res.x[0]
-        sigma_est = opt_res.x[1]
         path, states, _, _ = hmm.viterbi_algorithm(
             bafs=baf_data[f"baf_embryo{i}"],
             mat_haps=mat_haps,
@@ -59,11 +56,5 @@ if __name__ == "__main__":
         res_dict[f"paternal_rec{i}"] = paternal_rec
     if "pos" in baf_data:
         res_dict["pos"] = baf_data["pos"]
-    try:
-        res_dict["mother_id"] = snakemake.params["mother_id"]
-        res_dict["father_id"] = snakemake.params["father_id"]
-        res_dict["child_id"] = snakemake.params["child_id"]
-    except KeyError:
-        pass
     # Write out the hmm results to a compressed readout ...
     np.savez_compressed(snakemake.output["hmm_out"], **res_dict)

@@ -10,7 +10,7 @@ configfile: "config.yaml"
 rule all:
     input:
         phase_sims=expand(
-            "results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
+            "results/sims/inferhmm_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
             rep=range(config["co_sims"]["reps"]),
             pi0=config["co_sims"]["pi0"],
             std=config["co_sims"]["std_dev"],
@@ -42,21 +42,43 @@ rule sim_siblings:
 
 
 rule isolate_true_crossover:
-    """Isolate true crossovers from the simulations."""
+    """Isolate crossovers from simulations."""
     input:
         sib_data=rules.sim_siblings.output.sim,
     output:
-        "results/sims/true_co_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
+        true_co="results/sims/true_co_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
     run:
         nsibs = int(wildcards.nsibs)
         data = np.load(input.sib_data)
+        data_dict = {}
+        for i in range(nsibs):
+            zs_maternal = data[f"zs_maternal{i}"]
+            zs_paternal = data[f"zs_paternal{i}"]
+            # Shifts in indices are indicative of crossover
+            co_mat_pos = np.where(zs_maternal[1:] != zs_maternal[:-1])[0]
+            co_pat_pos = np.where(zs_paternal[1:] != zs_paternal[:-1])[0]
+            data_dict[f"co_pos_mat_{i}"] = co_mat_pos
+            data_dict[f"co_pos_pat_{i}"] = co_pat_pos
+        np.savez_compressed(output.true_co, **data_dict)
 
 
 rule estimate_co_hmm:
-    """Estimate crossovers"""
+    """Estimate crossover and their locations using the viterbi algorithm."""
     input:
-        baf_data=rules.sim_siblings.output.sim,
+        baf=rules.sim_siblings.output.sim,
     output:
-        hmm_out="results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
+        hmm_out="results/sims/inferhmm_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
+    params:
+        eps=-6,
     script:
         "scripts/hmm_siblings.py"
+
+
+rule filter_co_phase_err:
+    """Filter true crossovers from phase errors."""
+    input:
+        "results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
+    output:
+        "results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.filtered.npz",
+    script:
+        "scripts/filt_phase_err.py"
