@@ -1,5 +1,3 @@
-#!python3
-
 import numpy as np
 import pandas as pd
 
@@ -7,17 +5,12 @@ import pandas as pd
 configfile: "config.yaml"
 
 
+TARGETS = []
+
+
 rule all:
     input:
-        phase_sims=expand(
-            "results/sims/inferhmm_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
-            rep=range(config["co_sims"]["reps"]),
-            pi0=config["co_sims"]["pi0"],
-            std=config["co_sims"]["std_dev"],
-            m=config["co_sims"]["m"],
-            p=config["co_sims"]["phase_err"],
-            nsibs=config["co_sims"]["nsibs"],
-        ),
+        TARGETS,
 
 
 rule sim_siblings:
@@ -77,8 +70,33 @@ rule estimate_co_hmm:
 rule filter_co_phase_err:
     """Filter true crossovers from phase errors."""
     input:
-        "results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
+        "results/sims/inferhmm_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
     output:
-        "results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.filtered.npz",
+        "results/sims/inferhmm_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.{prop}.filtered.npz",
+    wildcard_constraints:
+        prop="\d+",
+    params:
+        prop=lambda wildcards: int(wildcards.prop) / 100,
     script:
         "scripts/filt_phase_err.py"
+
+
+rule concat_true_inferred:
+    """Create a table which contatenates the true and inferred results."""
+    input:
+        filtered="results/sims/inferhmm_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.{prop}.filtered.npz",
+        true_co="results/sims/true_co_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
+    output:
+        co_tsv=temp(
+            "results/sims/co_compare_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.tsv"
+        ),
+    run:
+        filt_infer_data = np.load(input.filtered)
+        true_data = np.load(input.true_co)
+        nsibs = int(wildcards.nsibs)
+        with open(output.co_tsv, "w+") as out:
+            out.write(
+                "rep\tpi0\tsigma\tm\tphase_err\tnsibs\tprop\tsib_index\ttrue_co_pat\tinf_co_pat\ttrue_co_mat\tinf_co_pat\n"
+            )
+            for i in nsibs:
+                pass
