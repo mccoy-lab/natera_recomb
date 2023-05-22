@@ -147,7 +147,7 @@ rule filter_triplet_pairs:
     output:
         valid_triplets="results/natera_inference/valid_trios.triplets.txt",
     shell:
-        "awk 'FNR==NR {{a[$1,$2] += 1;next}} a[$1, $2] >= 3 {{print $0}}' {input.valid_trios} {input.valid_triplets}"
+        "awk 'FNR==NR {{a[$1,$2] += 1;next}} a[$1, $2] >= 3 {{print $0}}' {input.valid_trios} {input.valid_trios} > {output.valid_triplets}"
 
 
 rule preprocess_baf_data:
