@@ -2,6 +2,8 @@
 
 import numpy as np
 import pandas as pd
+
+import pickle, gzip
 from tqdm import tqdm
 from pathlib import Path
 from io import StringIO
@@ -70,7 +72,7 @@ def create_trios(
     parents = [line.rstrip() for line in open(sample_file, "r")]
     # Applies a set of filters here
     valid_filt_trios = []
-    for (m, f, c) in tqdm(valid_trios):
+    for m, f, c in tqdm(valid_trios):
         if (
             (m in parents)
             and (f in parents)
@@ -82,26 +84,25 @@ def create_trios(
 
 
 total_data = []
-if Path("results/valid_disomy_trios.txt").is_file():
-    with open("results/valid_disomy_trios.txt", "r") as fp:
+if Path("results/natera_inference/valid_trios.triplets.txt").is_file():
+    with open("results/natera_inference/valid_trios.triplets.txt", "r") as fp:
         for i, line in enumerate(fp):
             [m, f, c] = line.rstrip().split()
             for l in lrrs:
                 total_data.append(
-                    f"results/natera_inference/{m}+{f}/{c}.{l}.total.posterior.tsv.gz"
+                    f"results/natera_inference/{m}+{f}/{c}.{l}.total.ploidy.tsv"
                 )
 
+
 # ------- Rules Section ------- #
-
-
 localrules:
     all,
-    hmm_model_chromosomes,
+    meta_hmm_chromosomes,
 
 
 rule all:
     input:
-        "results/natera_inference/valid_disomy_trios.txt",
+        "results/natera_inference/valid_trios.triplets.txt",
         total_data,
 
 
@@ -135,13 +136,18 @@ rule obtain_valid_trios:
             raw_data_path="/data/rmccoy22/natera_spectrum/data/",
         )
         with open(output.valid_trios, "w") as out:
-            for (m, f, c) in valid_trios:
+            for m, f, c in valid_trios:
                 out.write(f"{m}\t{f}\t{c}\n")
 
 
-rule filter_to_disomic_trios:
+rule filter_triplet_pairs:
+    """Filter to samples where mother + father have >= 3 embryos."""
     input:
-        disomic_embryos="",
+        valid_trios="results/natera_inference/valid_trios.txt",
+    output:
+        valid_triplets="results/natera_inference/valid_trios.triplets.txt",
+    shell:
+        "awk 'FNR==NR {{a[$1,$2] += 1;next}} a[$1, $2] >= 3 {{print $0}}' {input.valid_trios} {input.valid_triplets}"
 
 
 rule preprocess_baf_data:
@@ -160,7 +166,7 @@ rule preprocess_baf_data:
     * Assign BAF to be reflective of the alternative allele frequency in the parental VCF (accounting for the complement strand)
 
     * Filter out positions where either parent has a missing genotype
-
+    
     The specific steps can be found in `preprocess_natera.py` in greater detail with code examples as well.
     """
     input:
@@ -172,37 +178,24 @@ rule preprocess_baf_data:
         vcf_file=[vcf_dict[c] for c in chroms],
         child_data=lambda wildcards: find_child_data(wildcards.child_id)[0],
     output:
-        baf_npz=expand(
-            "results/natera_inference/{{mother_id}}+{{father_id}}/{{child_id}}.{chrom}.bafs.npz",
-            chrom=chroms,
-        ),
+        baf_pkl="results/natera_inference/{mother_id}+{father_id}/{child_id}.bafs.pkl.gz",
     resources:
-        time="2:00:00",
+        time="1:00:00",
         mem_mb="5G",
     wildcard_constraints:
         chrom="|".join(chroms),
-    run:
-        shell(
-            "mkdir -p results/natera_inference/{wildcards.mother_id}+{wildcards.father_id}/"
-        )
-        for v, o in zip(input.vcf_file, output.baf_npz):
-            shell(
-                "python3 scripts/preprocess_natera.py --child_csv {input.child_data} --cytosnp_map {input.cytosnp_map} --alleles_file {input.alleles_file} --cytosnp_cluster {input.egt_cluster}  --mother_id {wildcards.mother_id} --father_id {wildcards.father_id} --vcf_file {v} --meanr {input.meanr_file} --outfile {o}"
-            )
+    params:
+        chroms=chroms,
+    script:
+        "scripts/preprocess_natera.py"
 
 
-rule hmm_model_comparison:
+rule meta_hmm_model_chromosomes:
     """Apply the ploidy HMM to the pre-processed BAF data for this embryo."""
     input:
-        baf=expand(
-            "results/natera_inference/{{mother_id}}+{{father_id}}/{{child_id}}.{chrom}.bafs.npz",
-            chrom=chroms,
-        ),
+        baf_pkl="results/natera_inference/{mother_id}+{father_id}/{child_id}.bafs.pkl.gz",
     output:
-        hmm_out=expand(
-            "results/natera_inference/{{mother_id}}+{{father_id}}/{{child_id}}.{chrom}.{{lrr}}.hmm_model.npz",
-            chrom=chroms,
-        ),
+        hmm_pkl="results/natera_inference/{mother_id}+{father_id}/{child_id}.{lrr}.hmm_model.pkl.gz",
     wildcard_constraints:
         lrr="(none|raw|norm)",
     resources:
@@ -215,83 +208,66 @@ rule hmm_model_comparison:
         mother_id=lambda wildcards: f"{wildcards.mother_id}",
         father_id=lambda wildcards: f"{wildcards.father_id}",
         child_id=lambda wildcards: f"{wildcards.child_id}",
+        chroms=chroms,
     script:
         "scripts/baf_hmm_bulk.py"
+
+
+def bayes_factor(posteriors, priors=None):
+    """Compute Bayes Factors for evidence of specific aneuploidy states."""
+    if priors is None:
+        priors = np.ones(posteriors.size) / posteriors.size
+
+    assert posteriors.size == priors.size
+    assert np.isclose(np.sum(priors), 1.0)
+    bfs = np.zeros(posteriors.size)
+    for i in range(posteriors.size):
+        denom = np.sum(
+            [posteriors[j] * priors[i] for j in range(posteriors.size) if j != i]
+        )
+        bfs[i] = posteriors[i] * (1 - priors[i]) / denom
+    return bfs
 
 
 rule hmm_model_chromosomes:
     """Local rule that collapses all ploidy assignments into a single table."""
     input:
-        hmm_models=expand(
-            "results/natera_inference/{{mother_id}}+{{father_id}}/{{child_id}}.{chrom}.{{lrr}}.hmm_model.npz",
-            chrom=chroms,
-        ),
+        hmm_models="results/natera_inference/{mother_id}+{father_id}/{child_id}.{lrr}.hmm_model.pkl.gz",
     output:
         ploidy="results/natera_inference/{mother_id}+{father_id}/{child_id}.{lrr}.total.ploidy.tsv",
     resources:
-        time="0:10:00",
+        time="0:30:00",
         mem_mb="1G",
     params:
         lrr=lambda wildcards: wildcards.lrr != "none",
     run:
         with open(output.ploidy, "w") as out:
+            full_hmm_output = pickle.load(gzip.open(input.hmm_models, "r"))
             if not params["lrr"]:
                 out.write(
-                    "mother\tfather\tchild\tchrom\tsigma_baf\tpi0_baf\tpi0_lrr\tlrr_mu\tlrr_sd\t0\t1m\t1p\t2\t3m\t3p\n"
+                    "mother\tfather\tchild\tchrom\tsigma_baf\tpi0_baf\tpi0_lrr\tlrr_mu\tlrr_sd\t0\t1m\t1p\t2\t3m\t3p\tbf_max\tbf_max_cat\n"
                 )
-                for c, x in zip(chroms, input.hmm_models):
-                    data = np.load(x)
+                cats = np.array(["0", "1m", "1p", "2", "3m", "3p"])
+                for c in chroms:
+                    data = full_hmm_output[c]
+                    post_vals = np.array([data[x] for x in cats])
+                    bayes_factor_chrom = bayes_factor(post_vals)
+                    max_bf = np.max(bayes_factor_chrom)
+                    max_cat = cats[np.argmax(bayes_factor_chrom)]
                     out.write(
-                        f"{data['mother_id']}\t{data['father_id']}\t{data['child_id']}\t{c}\t{data['sigma_baf']}\t{data['pi0_baf']}\t{data['pi0_lrr']}\t{data['lrr_mu']}\t{data['lrr_sd']}\t{data['0']}\t{data['1m']}\t{data['1p']}\t{data['2']}\t{data['3m']}\t{data['3p']}\n"
+                        f"{data['mother_id']}\t{data['father_id']}\t{data['child_id']}\t{c}\t{data['sigma_baf']}\t{data['pi0_baf']}\t{data['pi0_lrr']}\t{data['lrr_mu']}\t{data['lrr_sd']}\t{data['0']}\t{data['1m']}\t{data['1p']}\t{data['2']}\t{data['3m']}\t{data['3p']}\t{max_bf}\t{max_cat}\n"
                     )
             else:
                 out.write(
-                    "mother\tfather\tchild\tchrom\tsigma_baf\tpi0_baf\tpi0_lrr\tlrr_mu\tlrr_sd\t0\t1m\t1p\t2m\t2p\t2\t3m\t3p\n"
+                    "mother\tfather\tchild\tchrom\tsigma_baf\tpi0_baf\tpi0_lrr\tlrr_mu\tlrr_sd\t0\t1m\t1p\t2m\t2p\t2\t3m\t3p\tbf_max\tbf_max_cat\n"
                 )
-                for c, x in zip(chroms, input.hmm_models):
-                    data = np.load(x)
+                cats = np.array(["0", "1m", "1p", "2m", "2p", "2", "3m", "3p"])
+                for c in chroms:
+                    data = full_hmm_output[c]
+                    post_vals = np.array([data[x] for x in cats])
+                    bayes_factor_chrom = bayes_factor(post_vals)
+                    max_bf = np.max(bayes_factor_chrom)
+                    max_cat = cats[np.argmax(bayes_factor_chrom)]
                     out.write(
-                        f"{data['mother_id']}\t{data['father_id']}\t{data['child_id']}\t{c}\t{data['sigma_baf']}\t{data['pi0_baf']}\t{data['pi0_lrr']}\t{data['lrr_mu']}\t{data['lrr_sd']}\t{data['0']}\t{data['1m']}\t{data['1p']}\t{data['2m']}\t{data['2p']}\t{data['2']}\t{data['3m']}\t{data['3p']}\n"
+                        f"{data['mother_id']}\t{data['father_id']}\t{data['child_id']}\t{c}\t{data['sigma_baf']}\t{data['pi0_baf']}\t{data['pi0_lrr']}\t{data['lrr_mu']}\t{data['lrr_sd']}\t{data['0']}\t{data['1m']}\t{data['1p']}\t{data['2m']}\t{data['2p']}\t{data['2']}\t{data['3m']}\t{data['3p']}\t{max_bf}\t{max_cat}\n"
                     )
-
-
-rule generate_posterior_table:
-    """Generates a full TSV with posterior probabilities for each embryo across ploidy states.
-
-    The columns of the TSV contain the specific karyotypes like 0, 1m, 1p, 2m, 2p, 2, 3m, 3p.
-
-    Each row corresponds to a specific SNP position.
-    """
-    input:
-        baf_data=expand(
-            "results/natera_inference/{{mother_id}}+{{father_id}}/{{child_id}}.{chrom}.bafs.npz",
-            chrom=chroms,
-        ),
-        hmm_models=expand(
-            "results/natera_inference/{{mother_id}}+{{father_id}}/{{child_id}}.{chrom}.{{lrr}}.hmm_model.npz",
-            chrom=chroms,
-        ),
-        ploidy="results/natera_inference/{mother_id}+{father_id}/{child_id}.{lrr}.total.ploidy.tsv",
-    output:
-        posterior="results/natera_inference/{mother_id}+{father_id}/{child_id}.{lrr}.total.posterior.tsv.gz",
-    resources:
-        time="0:30:00",
-        mem_mb="1G",
-    wildcard_constraints:
-        lrr="(none|raw|norm)",
-    run:
-        tot_dfs = []
-        for c, fp, baf in tqdm(zip(chroms, input.hmm_models, input.baf_data)):
-            data = np.load(fp)
-            baf_data = np.load(baf)
-            gammas = data["gammas"]
-            cur_df = pd.DataFrame(gammas.T)
-            cur_df.columns = data["states"]
-            cur_df["chrom"] = c
-            cur_df["pos"] = baf_data["pos"]
-            cur_df["rsid"] = baf_data["rsids"]
-            tot_dfs.append(cur_df)
-        df = pd.concat(tot_dfs)
-        cols_to_move = ["chrom", "pos", "rsid"]
-        df = df[cols_to_move + [col for col in df.columns if col not in cols_to_move]]
-        df.to_csv(output.posterior, sep="\t", index=None)
