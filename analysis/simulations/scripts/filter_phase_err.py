@@ -26,20 +26,20 @@ def filt_phase_err(breakpts, prop=0.5):
 
 
 if __name__ == "__main__":
-    nsibs = snakemake.params['nsibs']
-    prop = snakemake.params['prop']
-    data = np.load(snakemake.input['infer_hmm_co'])
+    nsibs = snakemake.params["nsibs"]
+    prop = snakemake.params["prop"]
+    data = np.load(snakemake.input["infer_hmm_co"])
     # Obtain maternal and paternal inferred breakpts
     maternal_breakpts = []
     paternal_breakpts = []
     for i in range(nsibs):
-        maternal_breakpts.append(data[f'maternal_rec{i}'].tolist())
-        paternal_breakpts.append(data[f'paternal_rec{i}'].tolist())
+        maternal_breakpts.append(data[f"maternal_rec{i}"].tolist())
+        paternal_breakpts.append(data[f"paternal_rec{i}"].tolist())
     # Filter the breakpts
     maternal_breakpts_filt = filt_phase_err(maternal_breakpts, prop=prop)
     paternal_breakpts_filt = filt_phase_err(paternal_breakpts, prop=prop)
     res_dict = {}
     for i in range(nsibs):
-        res_dict[f'mat_rec_filt_{i}'] = maternal_breakpts_filt[i]
-        res_dict[f'pat_rec_filt_{i}'] = paternal_breakpts_filt[i]
-    np.savez_compressed(snakemake.output['filt_co'], **res_dict)
+        res_dict[f"mat_rec_filt_{i}"] = maternal_breakpts_filt[i]
+        res_dict[f"pat_rec_filt_{i}"] = paternal_breakpts_filt[i]
+    np.savez_compressed(snakemake.output["filt_co"], **res_dict)

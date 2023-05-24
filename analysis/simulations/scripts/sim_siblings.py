@@ -11,16 +11,6 @@ lrr_mu = {0: -3.527211, 1: np.log2(0.5), 2: np.log2(1.0), 3: np.log2(1.5)}
 lrr_sd = {0: 1.329152, 1: 0.284338, 2: 0.159645, 3: 0.209089}
 
 
-def est_beta_params(xs, eps=1e-3):
-    """Estimated parameters of a beta distribution."""
-    xs_filt = xs[(xs > eps) & (xs < 1.0 - eps)]
-    mu_, var_ = np.mean(xs_filt), np.var(xs_filt)
-    a = ((1 - mu_) / var_ - 1 / mu_) * (mu_**2)
-    b = a * (1 / mu_ - 1)
-    assert (a > 0) and (b > 0)
-    return a, b
-
-
 def draw_parental_genotypes(afs=None, m=100, seed=42):
     """Draw parental genotypes from a beta distribution.
 
@@ -223,7 +213,6 @@ def sibling_euploid_sim(
 if __name__ == "__main__":
     if snakemake.params["sfs"] != "None":
         # Estimate the simulated allele frequency parameters
-        # NOTE: could potentially just do with numpy as well...
         afs = np.loadtxt(snakemake.params["sfs"])
     else:
         afs = None
