@@ -1,9 +1,48 @@
 import gzip as gz
 import pickle
 import sys
-
 import numpy as np
-from karyohmm import MetaHMM
+from karyohmm import QuadHMM
+
+def prepare_paired_data(embryo_id1='10013440016_R06C01', embryo_id2='10013440016_R04C01', embryo_id3='10013440016_R05C01', chrom='chr21', data_dict=test_family_data):
+    """Create the filtered dataset for evaluating crossovers using the QuadHMM results."""
+    data_embryo1 = test_family_data[embryo_id1][chrom]
+    data_embryo2 = test_family_data[embryo_id2][chrom]
+    data_embryo3 = test_family_data[embryo_id3][chrom]
+    if (data_embryo1['pos'].size != data_embryo2['pos'].size) or ((data_embryo1['pos'].size != data_embryo2['pos'].size)):
+        pos1 = data_embryo1['pos']
+        pos2 = data_embryo2['pos']
+        pos3 = data_embryo3['pos']
+        idx2 = np.isin(pos2, pos1) & np.isin(pos2, pos3)
+        idx1 = np.isin(pos1, pos2) & np.isin(pos1, pos3)
+        idx3 = np.isin(pos3, pos1) & np.isin(pos3, pos2)
+        baf1 = data_embryo1['baf_embryo'][idx1]
+        baf2 = data_embryo2['baf_embryo'][idx2]
+        baf3 = data_embryo3['baf_embryo'][idx3]
+        
+        mat_haps = data_embryo1['mat_haps'][:,idx1]
+        pat_haps = data_embryo1['pat_haps'][:,idx1]
+        assert baf1.size == baf2.size
+        assert baf2.size == baf3.size
+        # Return the maternal haplotypes, paternal haplotypes, baf
+        return mat_haps, pat_haps, baf1, baf2, baf3, pos1
+    else:
+        pos = data_embryo1['pos']
+        baf1 = data_embryo1['baf_embryo']
+        baf2 = data_embryo2['baf_embryo']
+        baf3 = data_embryo3['baf_embryo']
+        mat_haps = data_embryo1['mat_haps']
+        pat_haps = data_embryo1['pat_haps']
+        # Return the maternal haplotypes, paternal haplotypes, baf
+        assert baf1.size == baf2.size
+        assert baf2.size == baf3.size
+        return mat_haps, pat_haps, baf1, baf2, baf3, pos
+
+def find_nearest_het(pos, haps):
+    """Find the nearest heterozygote."""
+    assert pos.size == haps.shape[1]
+    pass
+
 
 if __name__ == "__main__":
     # Read in the input data and params ...
