@@ -21,7 +21,7 @@ def prepare_paired_data(embryo_id1='10013440016_R06C01', embryo_id2='10013440016
     data_embryo1 = data_dict[embryo_id1][chrom]
     data_embryo2 = data_dict[embryo_id2][chrom]
     data_embryo3 = data_dict[embryo_id3][chrom]
-    if (data_embryo1['pos'].size != data_embryo2['pos'].size) or ((data_embryo1['pos'].size != data_embryo2['pos'].size)):
+    if (data_embryo1['pos'].size != data_embryo2['pos'].size) or ((data_embryo2['pos'].size != data_embryo3['pos'].size)):
         pos1 = data_embryo1['pos']
         pos2 = data_embryo2['pos']
         pos3 = data_embryo3['pos']
@@ -31,13 +31,12 @@ def prepare_paired_data(embryo_id1='10013440016_R06C01', embryo_id2='10013440016
         baf1 = data_embryo1['baf_embryo'][idx1]
         baf2 = data_embryo2['baf_embryo'][idx2]
         baf3 = data_embryo3['baf_embryo'][idx3]
-        
         mat_haps = data_embryo1['mat_haps'][:,idx1]
         pat_haps = data_embryo1['pat_haps'][:,idx1]
         assert baf1.size == baf2.size
         assert baf2.size == baf3.size
         # Return the maternal haplotypes, paternal haplotypes, baf
-        return mat_haps, pat_haps, baf1, baf2, baf3, pos1
+        return mat_haps, pat_haps, baf1, baf2, baf3, pos1[idx1]
     else:
         pos = data_embryo1['pos']
         baf1 = data_embryo1['baf_embryo']
@@ -50,14 +49,21 @@ def prepare_paired_data(embryo_id1='10013440016_R06C01', embryo_id2='10013440016
         assert baf2.size == baf3.size
         return mat_haps, pat_haps, baf1, baf2, baf3, pos
 
-def find_nearest_het(pos, haps):
+def find_nearest_het(idx, pos, haps):
     """Find the nearest heterozygotes to the estimated crossover position."""
+    assert idx >= 0 and idx <= haps.shape[1]
     assert pos.size == haps.shape[1]
     geno = haps[0,:] + haps[1,:]
     het_idx = np.where(geno == 1)[0]
-    left_boundary = het_idx[het_idx <= pos][-1]
-    right_boundary = het_idx[het_idx >= pos][0]
-    return left_boundary, right_boundary
+    if idx < np.min(het_idx):
+        left_boundary = np.nan
+    else:
+        left_boundary = pos[het_idx[het_idx <= idx][-1]]
+    if idx > np.max(het_idx):
+        right_boundary = np.nan
+    else:
+        right_boundary = pos[het_idx[het_idx >= idx][0]]
+    return left_boundary, pos[idx], right_boundary
 
 if __name__ == "__main__":
     # Read in the input data and params ...
@@ -77,14 +83,10 @@ if __name__ == "__main__":
             refined_path_02 = hmm.restrict_path(path_02)
             mat_rec, pat_rec = hmm.isolate_recomb(refined_path_01, refined_path_02)
             for m in mat_rec:
-                rec_pos = pos[m[0]]
-                left_idx, right_idx = find_nearest_het(m[0], mat_haps)
-                left, right = pos[left_idx], pos[right_idx]
+                left, rec_pos, right = find_nearest_het(m[0], pos, mat_haps)                
                 lines.append(f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tmaternal\t{left}\t{rec_pos}\t{right}')
             for p in pat_rec:
-                rec_pos = pos[p[0]]
-                left_idx, right_idx = find_nearest_het(p[0], mat_haps)
-                left, right = pos[left_idx], pos[right_idx]
+                left, rec_pos, right = find_nearest_het(p[0], pos, pat_haps)                
                 lines.append(f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tpaternal\t{left}\t{rec_pos}\t{right}')
     with open(snakemake.output['est_recomb'], 'w') as out:
         out.write('mother\tfather\tchild\tchrom\tcrossover_sex\tmin_pos\tavg_pos\tmax_pos\n')
