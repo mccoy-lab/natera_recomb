@@ -84,10 +84,10 @@ if __name__ == "__main__":
             mat_rec, pat_rec = hmm.isolate_recomb(refined_path_01, refined_path_02)
             for m in mat_rec:
                 left, rec_pos, right = find_nearest_het(m[0], pos, mat_haps)                
-                lines.append(f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tmaternal\t{left}\t{rec_pos}\t{right}')
+                lines.append(f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tmaternal\t{left}\t{rec_pos}\t{right}\n')
             for p in pat_rec:
                 left, rec_pos, right = find_nearest_het(p[0], pos, pat_haps)                
-                lines.append(f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tpaternal\t{left}\t{rec_pos}\t{right}')
+                lines.append(f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tpaternal\t{left}\t{rec_pos}\t{right}\n')
     with open(snakemake.output['est_recomb'], 'w') as out:
         out.write('mother\tfather\tchild\tchrom\tcrossover_sex\tmin_pos\tavg_pos\tmax_pos\n')
         for line in lines:
