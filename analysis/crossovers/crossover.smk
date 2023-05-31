@@ -175,7 +175,7 @@ rule estimate_recombination_euploid_trio:
     params:
         chroms=chroms,
     resources:
-        time="1:00:00",
+        time="3:00:00",
         mem_mb="5G",
     script:
         "scripts/sibling_hmm.py"
