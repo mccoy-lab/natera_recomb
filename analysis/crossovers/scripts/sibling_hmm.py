@@ -2,13 +2,25 @@ import gzip as gz
 import pickle
 import sys
 import numpy as np
+from pathlib import Path
+from tqdm import tqdm
 from karyohmm import QuadHMM
 
-def prepare_paired_data(embryo_id1='10013440016_R06C01', embryo_id2='10013440016_R04C01', embryo_id3='10013440016_R05C01', chrom='chr21', data_dict=test_family_data):
+def load_baf_data(baf_pkls):
+    """Load in the multiple BAF datasets."""
+    family_data = {}
+    for fp in baf_pkls:
+        embryo_name = Path(fp).stem.split('.')[0]
+        with gz.open(fp, 'rb') as f:
+            data = pickle.load(f)
+            family_data[embryo_name] = data
+    return family_data
+
+def prepare_paired_data(embryo_id1='10013440016_R06C01', embryo_id2='10013440016_R04C01', embryo_id3='10013440016_R05C01', chrom='chr21', data_dict=None):
     """Create the filtered dataset for evaluating crossovers using the QuadHMM results."""
-    data_embryo1 = test_family_data[embryo_id1][chrom]
-    data_embryo2 = test_family_data[embryo_id2][chrom]
-    data_embryo3 = test_family_data[embryo_id3][chrom]
+    data_embryo1 = data_dict[embryo_id1][chrom]
+    data_embryo2 = data_dict[embryo_id2][chrom]
+    data_embryo3 = data_dict[embryo_id3][chrom]
     if (data_embryo1['pos'].size != data_embryo2['pos'].size) or ((data_embryo1['pos'].size != data_embryo2['pos'].size)):
         pos1 = data_embryo1['pos']
         pos2 = data_embryo2['pos']
@@ -39,106 +51,42 @@ def prepare_paired_data(embryo_id1='10013440016_R06C01', embryo_id2='10013440016
         return mat_haps, pat_haps, baf1, baf2, baf3, pos
 
 def find_nearest_het(pos, haps):
-    """Find the nearest heterozygote."""
+    """Find the nearest heterozygotes to the estimated crossover position."""
     assert pos.size == haps.shape[1]
-    pass
-
+    geno = haps[0,:] + haps[1,:]
+    het_idx = np.where(geno == 1)[0]
+    left_boundary = het_idx[het_idx <= pos][-1]
+    right_boundary = het_idx[het_idx >= pos][0]
+    return left_boundary, right_boundary
 
 if __name__ == "__main__":
     # Read in the input data and params ...
-    eps = 10 ** snakemake.params["eps"]
-    lrr = snakemake.params["lrr"]
-    data = pickle.load(gz.open(snakemake.input["baf_pkl"], "r"))
-    full_chrom_hmm_dict = {}
-    for c in snakemake.params["chroms"]:
-        baf_data = data[c]
-        print("Running meta HMM parameter estimation ...", file=sys.stderr)
-        n01 = np.nansum((baf_data["baf_embryo"] == 1) | (baf_data["baf_embryo"] == 0))
-        m = baf_data["baf_embryo"].size
-        if n01 == m:
-            print("Warning: all BAF values were either [0,1].", file=sys.stderr)
-            res_dict = {
-                "0": np.nan,
-                "1m": np.nan,
-                "1p": np.nan,
-                "2m": np.nan,
-                "2p": np.nan,
-                "2": np.nan,
-                "3m": np.nan,
-                "3p": np.nan,
-                "sigma_baf": np.nan,
-                "pi0_baf": np.nan,
-                "pi0_lrr": np.nan,
-                "lrr_mu": np.nan,
-                "lrr_sd": np.nan,
-                "aploid": baf_data["aploid"],
-            }
-        else:
-            logr = False
-            lrrs = np.ones(baf_data["baf_embryo"].size)
-            if lrr == "raw":
-                lrrs = np.nan_to_num(baf_data["lrr_embryo_raw"])
-                logr = True
-            elif lrr == "norm":
-                lrrs = np.nan_to_num(baf_data["lrr_embryo_norm"])
-                logr = True
-            hmm = MetaHMM(logr=logr)
-            # NOTE: this naively just takes every other snp to reduce runtimes ...
-            pi0_est, sigma_est = hmm.est_sigma_pi0(
-                bafs=baf_data["baf_embryo"][::2],
-                lrrs=lrrs[::2],
-                mat_haps=baf_data["mat_haps"][:, ::2],
-                pat_haps=baf_data["pat_haps"][:, ::2],
-                eps=eps,
-                unphased=snakemake.params["unphased"],
-                logr=False,
-            )
-            pi0_lrr = np.nan
-            lrr_mu = None
-            lrr_sd = None
-            if logr:
-                pi0_lrr, lrr_mu, lrr_sd, _ = hmm.est_lrr_sd(lrrs, niter=50)
-            print("Finished meta HMM parameter estimation ...", file=sys.stderr)
-            print("Starting meta HMM forward-backward algorithm", file=sys.stderr)
-            gammas, states, karyotypes = hmm.forward_backward(
-                bafs=baf_data["baf_embryo"],
-                lrrs=lrrs,
-                mat_haps=baf_data["mat_haps"],
-                pat_haps=baf_data["pat_haps"],
-                pi0=pi0_est,
-                std_dev=sigma_est,
-                pi0_lrr=pi0_lrr,
-                lrr_mu=lrr_mu,
-                lrr_sd=lrr_sd,
-                eps=eps,
-                unphased=snakemake.params["unphased"],
-                logr=logr,
-            )
-            print(
-                "Finished running meta HMM forward-backward algorithm ...",
-                file=sys.stderr,
-            )
-            res_dict = hmm.posterior_karyotypes(gammas, karyotypes)
-            res_dict["sigma_baf"] = sigma_est
-            res_dict["pi0_baf"] = pi0_est
-            res_dict["pi0_lrr"] = pi0_lrr
-            res_dict["lrr_mu"] = (
-                np.nan if lrr_mu is None else ",".join([str(m) for m in lrr_mu])
-            )
-            res_dict["lrr_sd"] = (
-                np.nan if lrr_sd is None else ",".join([str(s) for s in lrr_sd])
-            )
-            res_dict["aploid"] = baf_data["aploid"]
-            res_dict["karyotypes"] = karyotypes
-            res_dict["gammas"] = gammas.astype(np.float16)
-            res_dict["states"] = np.array(
-                [hmm.get_state_str(s) for s in states], dtype=str
-            )
-        try:
-            res_dict["mother_id"] = snakemake.params["mother_id"]
-            res_dict["father_id"] = snakemake.params["father_id"]
-            res_dict["child_id"] = snakemake.params["child_id"]
-        except KeyError:
-            pass
-        full_chrom_hmm_dict[c] = res_dict
-    pickle.dump(full_chrom_hmm_dict, gz.open(snakemake.output["hmm_pkl"], "wb"))
+    hmm = QuadHMM()
+    family_data = load_baf_data(snakemake.input['baf_pkl'])
+    names = [k for k in family_data.keys()]
+    nsibs = len(names)
+    lines = []
+    for c in tqdm(snakemake.params["chroms"]):
+        for i in range(nsibs):
+            j = (i + 1) % nsibs
+            j2 = (i + 2) % nsibs
+            mat_haps, pat_haps, baf0, baf1, baf2, pos = prepare_paired_data(embryo_id1=names[i], embryo_id2=names[j], embryo_id3=names[j2], chrom=c, data_dict=family_data)
+            path_01, _, _,_ = hmm.viterbi_algorithm(bafs=[baf0, baf1], mat_haps=mat_haps, pat_haps=pat_haps, r=1e-18)
+            refined_path_01 = hmm.restrict_path(path_01)
+            path_02, _, _,_ = hmm.viterbi_algorithm(bafs=[baf0, baf2], mat_haps=mat_haps, pat_haps=pat_haps, r=1e-18)
+            refined_path_02 = hmm.restrict_path(path_02)
+            mat_rec, pat_rec = hmm.isolate_recomb(refined_path_01, refined_path_02)
+            for m in mat_rec:
+                rec_pos = pos[m[0]]
+                left_idx, right_idx = find_nearest_het(m[0], mat_haps)
+                left, right = pos[left_idx], pos[right_idx]
+                lines.append(f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tmaternal\t{left}\t{rec_pos}\t{right}')
+            for p in pat_rec:
+                rec_pos = pos[p[0]]
+                left_idx, right_idx = find_nearest_het(p[0], mat_haps)
+                left, right = pos[left_idx], pos[right_idx]
+                lines.append(f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tpaternal\t{left}\t{rec_pos}\t{right}')
+    with open(snakemake.output['est_recomb'], 'w') as out:
+        out.write('mother\tfather\tchild\tchrom\tcrossover_sex\tmin_pos\tavg_pos\tmax_pos\n')
+        for line in lines:
+            out.write(line)
