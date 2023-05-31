@@ -79,9 +79,7 @@ if Path("results/natera_inference/valid_trios.triplets.euploid.txt").is_file():
     with open("results/natera_inference/valid_trios.triplets.euploid.txt", "r") as fp:
         for i, line in enumerate(fp):
             [m, f, _] = line.rstrip().split()
-            total_data.append(
-                f"results/natera_inference/{m}+{f}.est_recomb.tsv"
-            )
+            total_data.append(f"results/natera_inference/{m}+{f}.est_recomb.tsv")
         total_data = np.unique(total_data).tolist()
 
 
@@ -151,23 +149,31 @@ rule filter_putative_euploid_triplets:
         "scripts/filter_euploid.py"
 
 
-def define_triplets(mother_id, father_id, trio_file='results/natera_inference/valid_trios.triplets.euploid.txt', base_path='/home/abiddan1/scratch16/natera_aneuploidy/analysis/aneuploidy/results/natera_inference'):
+def define_triplets(
+    mother_id,
+    father_id,
+    trio_file="results/natera_inference/valid_trios.triplets.euploid.txt",
+    base_path="/home/abiddan1/scratch16/natera_aneuploidy/analysis/aneuploidy/results/natera_inference",
+):
     trio_df = pd.read_csv(trio_file, sep="\t")
     filt_df = trio_df[(trio_df.mother == mother_id) & (trio_df.father == father_id)]
     res = []
     for c in filt_df.child.values:
-        res.append(f'{base_path}/{mother_id}+{father_id}/{c}.bafs.pkl.gz')
+        res.append(f"{base_path}/{mother_id}+{father_id}/{c}.bafs.pkl.gz")
     return res
+
 
 rule estimate_recombination_euploid_trio:
     """Estimate crossover events in euploid trio datasets."""
     input:
         euploid_triplets="results/natera_inference/valid_trios.triplets.euploid.txt",
-        baf_pkl = lambda wildcards: define_triplets(mother_id = wildcards.mother, father_id=wildcards.father)
+        baf_pkl=lambda wildcards: define_triplets(
+            mother_id=wildcards.mother, father_id=wildcards.father
+        ),
     output:
-        est_recomb="results/natera_inference/{mother}+{father}.est_recomb.tsv"
+        est_recomb="results/natera_inference/{mother}+{father}.est_recomb.tsv",
     params:
-        chroms=chroms
+        chroms=chroms,
     resources:
         time="1:00:00",
         mem_mb="5G",
