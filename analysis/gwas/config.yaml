@@ -1,9 +1,7 @@
 project_name: "natera_recombination_gwas"
 metadata: "../../data/spectrum_metadata_merged.csv"
+crossovers: "../../sandbox/crossovers.euploid_only.053123.v2.tsv.gz"
 datadir: "/data/rmccoy22/natera_spectrum/genotypes/imputed_parents_031423/"
-phenotypes:
-  - "mean_co_per_chrom"
-  - "var_co_per_chrom"
 methods:
-  - "plink2"
+  # - "plink2"
   - "regenie"
