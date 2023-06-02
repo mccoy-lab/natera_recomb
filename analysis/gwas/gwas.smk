@@ -12,10 +12,6 @@ from io import StringIO
 # ---- Parameters for inference in Natera Data ---- #
 configfile: "config.yaml"
 
-
-include: "snakefiles/phenotyping.smk"
-
-
 # Create the VCF data dictionary for each chromosome ...
 vcf_dict = {}
 chroms = [f"chr{i}" for i in range(19, 23)]
@@ -43,10 +39,10 @@ rule all:
         #     project_name=config["project_name"],
         # ),
         expand(
-            "results/pgen_input/{project_name}_{sex}_{pheno}.regenie",
+            "results/gwas_output/regenie/{project_name}_{sex}_{format}_{pheno}.regenie",
             project_name=config["project_name"],
             sex=["Male", "Female"],
-            pheno=["MeanCO", "VarCO", "RandPheno"],
+            pheno=["MeanCO", "VarCO", "RandPheno"], format='regenie'
         ),
 
 
@@ -198,12 +194,14 @@ rule regenie_step1:
         sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
     output:
         expand(
-            "results/pgen_input/{{project_name}}_{{sex}}_{pheno}.loco",
-            pheno=["MeanCO", "VarCO", "RandPheno"],
+            "results/gwas_output/regenie/{{project_name}}_{{sex}}_{{format}}_{pheno}.loco",
+            pheno=["MeanCO", "VarCO", "RandPheno"]
         ),
+    wildcard_constraints:
+        format="regenie"
     shell:
         """
-        regenie --step 1 --pgen results/pgen_input/{project_name} --covarFile {inputs.covar} --phenoFile {input.pheno} --remove {input.sex_exclusion} --bsize 100 --lowmem --lowmem-prefix tmp_rg --out results/gwas_output/{project_name}_{sex}
+        regenie --step 1 --pgen results/pgen_input/{wildcards.project_name} --covarFile {input.covar} --phenoFile {input.pheno} --remove {input.sex_exclusion} --bsize 100 --lowmem --lowmem-prefix tmp_rg --out results/gwas_output/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}
         """
 
 
@@ -217,17 +215,19 @@ rule regenie_step2:
         covar="results/covariates/{project_name}.covars.{format}.txt",
         sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
         loco_pred=expand(
-            "results/pgen_input/{{project_name}}_{{sex}}_{pheno}.loco",
-            pheno=["MeanCO", "VarCO", "RandPheno"],
+            "results/gwas_output/regenie/{{project_name}}_{{sex}}_{format}_{pheno}.loco",
+            pheno=["MeanCO", "VarCO", "RandPheno"], format='regenie'
         ),
     output:
         expand(
-            "results/pgen_input/{{project_name}}_{{sex}}_{pheno}.regenie",
-            pheno=["MeanCO", "VarCO", "RandPheno"],
+            "results/gwas_output/regenie/{{project_name}}_{{sex}}_{{format}}_{pheno}.regenie",
+            pheno=["MeanCO", "VarCO", "RandPheno"]
         ),
+    wildcard_constraints:
+        format="regenie"
     shell:
         """
-        regenie --step 2 --pgen results/pgen_input/{project_name} --covarFile {inputs.covar} --phenoFile {input.pheno} --remove {input.sex_exclusion} --bsize 100 --lowmem --lowmem-prefix tmp_rg --out results/gwas_output/{project_name}_{sex}
+        regenie --step 2 --pgen results/pgen_input/{wildcards.project_name} --covarFile {input.covar} --phenoFile {input.pheno} --remove {input.sex_exclusion} --bsize 100 --lowmem --lowmem-prefix tmp_rg --out results/gwas_output/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}
         """
 
 
