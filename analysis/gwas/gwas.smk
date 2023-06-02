@@ -34,13 +34,19 @@ localrules:
 
 rule all:
     input:
+        # expand(
+        #     "results/covariates/{project_name}.eigenvec",
+        #     project_name=config["project_name"],
+        # ),
+        # expand(
+        #     "results/covariates/{project_name}.king.cutoff.out.id",
+        #     project_name=config["project_name"],
+        # ),
         expand(
-            "results/covariates/{project_name}.eigenvec",
+            "results/pgen_input/{project_name}_{sex}_{pheno}.regenie",
             project_name=config["project_name"],
-        ),
-        expand(
-            "results/covariates/{project_name}.king.cutoff.out.id",
-            project_name=config["project_name"],
+            sex=["Male", "Female"],
+            pheno=["MeanCO", "VarCO", "RandPheno"],
         ),
 
 
@@ -142,16 +148,87 @@ rule create_full_covariates:
 rule create_full_quant_phenotypes:
     """Create the full quantitative phenotype."""
     input:
-        co_master_folder=config["crossovers"],
+        co_data=config["crossovers"],
     output:
-        pheno="results/phenotypes/{project_name}.pheno",
+        pheno="results/phenotypes/{project_name}.{format}.pheno",
     params:
-        phenotype_type="quant",
+        plink_format=lambda wildcards: wildcards.format == "plink2",
     script:
         "scripts/create_rec_phenotypes.py"
 
 
 # ------ 3. Run GWAS using REGENIE across phenotypes ------ #
+
+
+rule create_sex_exclude_file:
+    input:
+        covar="results/covariates/{project_name}.covars.{format}.txt",
+        king_excludes="results/covariates/{project_name}.king.cutoff.out.id",
+    output:
+        sex_specific="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
+    wildcard_constraints:
+        sex="Male|Female",
+    params:
+        plink_format=lambda wildcards: wildcards.format == "plink2",
+    run:
+        cov_df = pd.read_csv(snakemake.input["covar"], sep="\t")
+        king_df = pd.read_csv(snakemake.input["king_excludes"], sep="\t")
+        if wildcards.sex == "Male":
+            exclude_sex_df = cov_df[cov_df.Sex == 0]
+        else:
+            exclude_sex_df = cov_df[cov_df.Sex == 1]
+        if ~snakemake.params["plink_format"]:
+            king_df.columns = ["FID", "IID"]
+        concat_df = pd.concat([exclude_sex_df, king_df])
+        if ~snakemake.params["plink_format"]:
+            out_df = concat_df[["#FID", "IID"]].drop_duplicates()
+        else:
+            out_df = concat_df[["FID", "IID"]].drop_duplicates()
+        out_df.to_csv(snakemake.output["sex_specific"], index=None, sep="\t")
+
+
+rule regenie_step1:
+    """Run the first step of REGENIE for polygenic prediction."""
+    input:
+        pgen="results/pgen_input/{project_name}.pgen",
+        psam="results/pgen_input/{project_name}.psam",
+        pvar="results/pgen_input/{project_name}.pvar",
+        pheno="results/phenotypes/{project_name}.{format}.pheno",
+        covar="results/covariates/{project_name}.covars.{format}.txt",
+        sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
+    output:
+        expand(
+            "results/pgen_input/{{project_name}}_{{sex}}_{pheno}.loco",
+            pheno=["MeanCO", "VarCO", "RandPheno"],
+        ),
+    shell:
+        """
+        regenie --step 1 --pgen results/pgen_input/{project_name} --covarFile {inputs.covar} --phenoFile {input.pheno} --remove {input.sex_exclusion} --bsize 100 --lowmem --lowmem-prefix tmp_rg --out results/gwas_output/{project_name}_{sex}
+        """
+
+
+rule regenie_step2:
+    """Run the second step of REGENIE for effect-size estimation."""
+    input:
+        pgen="results/pgen_input/{project_name}.pgen",
+        psam="results/pgen_input/{project_name}.psam",
+        pvar="results/pgen_input/{project_name}.pvar",
+        pheno="results/phenotypes/{project_name}.{format}.pheno",
+        covar="results/covariates/{project_name}.covars.{format}.txt",
+        sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
+        loco_pred=expand(
+            "results/pgen_input/{{project_name}}_{{sex}}_{pheno}.loco",
+            pheno=["MeanCO", "VarCO", "RandPheno"],
+        ),
+    output:
+        expand(
+            "results/pgen_input/{{project_name}}_{{sex}}_{pheno}.regenie",
+            pheno=["MeanCO", "VarCO", "RandPheno"],
+        ),
+    shell:
+        """
+        regenie --step 2 --pgen results/pgen_input/{project_name} --covarFile {inputs.covar} --phenoFile {input.pheno} --remove {input.sex_exclusion} --bsize 100 --lowmem --lowmem-prefix tmp_rg --out results/gwas_output/{project_name}_{sex}
+        """
 
 
 # ------ 4. Run GWAS using Plink2 across phenotypes ------ #

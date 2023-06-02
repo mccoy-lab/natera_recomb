@@ -1,6 +1,6 @@
 project_name: "natera_recombination_gwas"
 metadata: "../../data/spectrum_metadata_merged.csv"
-crossovers: "../../sandbox/crossovers.euploid_only.053123.v2.tsv.gz"
+crossovers: "../../sandbox/crossovers.euploid_only.060223.v3.tsv.gz"
 datadir: "/data/rmccoy22/natera_spectrum/genotypes/imputed_parents_031423/"
 methods:
   # - "plink2"
