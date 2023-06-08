@@ -102,7 +102,7 @@ rule compute_pcs:
         outfix=lambda wildcards: f"results/covariates/{wildcards['project_name']}",
     shell:
         """
-        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --maf 0.01 --indep-pairwise 200 25 0.2 --out {params.outfix}
+        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --maf 0.05 --indep-pairwise 200 25 0.2 --out {params.outfix}
         plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --extract {output.keep_variants} --pca {params.npcs} approx --out {params.outfix}
         """
 

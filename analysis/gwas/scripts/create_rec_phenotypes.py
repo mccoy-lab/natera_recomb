@@ -3,6 +3,7 @@
 import numpy as np 
 from scipy import stats
 import pandas as pd
+from tqdm import tqdm
 
 def mean_var_co_per_genome(df):
     """Compute the average number of crossovers per-chromosome for an individual."""
@@ -10,12 +11,14 @@ def mean_var_co_per_genome(df):
     assert 'father' in df.columns
     assert 'child' in df.columns
     assert 'crossover_sex' in df.columns
+    assert 'chrom' in df.columns
+    co_df = df.groupby(['mother', 'father', 'child', 'crossover_sex']).count().reset_index().rename(columns={'chrom': 'n_crossover'})[['mother', 'father', 'child', 'crossover_sex', 'n_crossover']]
     data = []
-    for m in np.unique(df.mother):
-        values = df[(df.mother == m) & (df.crossover_sex == 'maternal')].groupby('child').count()['mother'].values
+    for m in tqdm(np.unique(co_df.mother)):
+        values = co_df[(co_df.mother == m) & (co_df.crossover_sex == 'maternal')]['n_crossover'].values
         data.append([m,m, np.mean(values), np.var(values)])
-    for p in np.unique(df.father):
-        values = df[(df.father == p) & (df.crossover_sex == 'paternal')].groupby('child').count()['mother'].values
+    for p in tqdm(np.unique(df.father)):
+        values = co_df[(co_df.father == p) & (co_df.crossover_sex == 'paternal')]['n_crossover'].values
         data.append([p,p, np.mean(values), np.var(values)])
     out_df = pd.DataFrame(data)
     out_df.columns = ['FID', 'IID', 'MeanCO', 'VarCO']
@@ -40,7 +43,7 @@ def random_pheno(df, seed=42):
     out_df.columns = ['FID', 'IID', 'RandPheno']
     return out_df
 
-    
+
 if __name__ == '__main__':
     """Create several phenotypes for analysis of recombination."""
     co_df = pd.read_csv(snakemake.input['co_data'], sep="\t")
@@ -49,4 +52,4 @@ if __name__ == '__main__':
     merged_df = mean_R_df.merge(rand_df)
     if snakemake.params['plink_format']:
         merged_df.rename(columns={'FID':"#FID"})
-    merged_df.to_csv(snakemake.output['co_data'], sep="\t", index=None)
+    merged_df.to_csv(snakemake.output['pheno'], sep="\t", index=None)
