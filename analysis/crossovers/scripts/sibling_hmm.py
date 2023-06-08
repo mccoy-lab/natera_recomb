@@ -61,21 +61,26 @@ def prepare_paired_data(
         return mat_haps, pat_haps, baf1, baf2, baf3, pos
 
 
-def find_nearest_het(idx, pos, haps):
+def find_nearest_het(idx, pos, haps_focal, haps_alt):
     """Find the nearest heterozygotes to the estimated crossover position."""
-    assert idx >= 0 and idx <= haps.shape[1]
-    assert pos.size == haps.shape[1]
-    geno = haps[0, :] + haps[1, :]
-    het_idx = np.where(geno == 1)[0]
+    assert idx >= 0 and idx <= haps_focal.shape[1]
+    assert pos.size == haps_focal.shape[1]
+    geno_focal = haps_focal[0, :] + haps_focal[1, :]
+    geno_alt = haps_alt[0, :] + haps_alt[1, :]
+    het_idx = np.where((geno_focal == 1) & ((geno_alt == 0) | (geno_alt == 2)))[0]
     if idx < np.min(het_idx):
-        left_boundary = np.nan
+        left_pos = np.nan
+        left_idx = np.nan
     else:
-        left_boundary = pos[het_idx[het_idx <= idx][-1]]
+        left_idx = het_idx[het_idx <= idx][-1]
+        left_pos = pos[left_idx]
     if idx > np.max(het_idx):
-        right_boundary = np.nan
+        right_idx = np.nan
+        right_pos = np.nan
     else:
-        right_boundary = pos[het_idx[het_idx >= idx][0]]
-    return left_boundary, pos[idx], right_boundary
+        right_idx = het_idx[het_idx >= idx][0]
+        right_pos = pos[right_idx]
+    return left_idx, left_pos, right_idx, right_pos
 
 
 if __name__ == "__main__":
@@ -87,7 +92,7 @@ if __name__ == "__main__":
     recomb_dict = {}
     lines = []
     for c in tqdm(snakemake.params["chroms"]):
-        pkl_dict[c] = {}
+        recomb_dict[c] = {}
         for i in range(nsibs):
             j = (i + 1) % nsibs
             j2 = (i + 2) % nsibs
@@ -127,16 +132,18 @@ if __name__ == "__main__":
             )
             recomb_dict[c][f'{names[i]}+{names[j]}+{names[j2]}'] = {'pos': pos, 'path_01': refined_path_01, 'path_02': refined_path_02, 'pi0_01': pi0_01, 'pi0_02': pi0_02, 'sigma_01': sigma_01, 'sigma_02': sigma_02}
             for m in mat_rec:
-                left, rec_pos, right = find_nearest_het(m[0], pos, mat_haps)
+                _, left_pos, _, right_pos = find_nearest_het(m[0], pos, mat_haps, pat_haps)
+                rec_pos = pos[m[0]]
                 lines.append(
-                    f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tmaternal\t{left}\t{rec_pos}\t{right}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
+                    f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tmaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
                 )
             for p in pat_rec:
-                left, rec_pos, right = find_nearest_het(p[0], pos, pat_haps)
+                _, left_pos, _,  right_pos = find_nearest_het(p[0], pos, pat_haps, mat_haps)
+                rec_pos = pos[p[0]]
                 lines.append(
-                    f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tpaternal\t{left}\t{rec_pos}\t{right}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
+                    f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tpaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
                 )
-    # Write out the path dictionary with the tracebacks 
+    # Write out the path dictionary with the viterbi traces 
     pickle.dump(recomb_dict, gz.open(snakemake.output["recomb_paths"], "wb"))
     # Write out the formal crossover spot output here 
     with open(snakemake.output["est_recomb"], "w") as out:
