@@ -30,14 +30,6 @@ localrules:
 
 rule all:
     input:
-        # expand(
-        #     "results/covariates/{project_name}.eigenvec",
-        #     project_name=config["project_name"],
-        # ),
-        # expand(
-        #     "results/covariates/{project_name}.king.cutoff.out.id",
-        #     project_name=config["project_name"],
-        # ),
         expand(
             "results/gwas_output/regenie/{project_name}_{sex}_{format}_{pheno}.regenie",
             project_name=config["project_name"],
@@ -58,10 +50,14 @@ rule vcf2pgen:
     wildcard_constraints:
         chrom="|".join(chroms),
         project_name=config["project_name"],
+    resources:
+        time="1:00:00",
+        mem_mb="8G",
+    threads: 20
     params:
         outfix=lambda wildcards: f"results/pgen_input/{wildcards.project_name}.{wildcards.chrom}",
     shell:
-        "plink2 --vcf {input.vcf_file} dosage=DS --double-id --make-pgen --out {params.outfix} "
+        "plink2 --vcf {input.vcf_file} dosage=DS --double-id --maf 0.001 --threads {threads} --make-pgen --out {params.outfix} "
 
 
 rule merge_full_pgen:
@@ -78,10 +74,14 @@ rule merge_full_pgen:
         pvar="results/pgen_input/{project_name}.pvar",
     params:
         outfix=lambda wildcards: f"results/pgen_input/{wildcards['project_name']}",
+    resources:
+        time="1:00:00",
+        mem_mb="5G",
+    threads: 20
     shell:
         """
         for i in {chroms}; do echo \"results/pgen_input/{wildcards.project_name}.$i\" ; done > {output.tmp_merge_file}
-        plink2 --pmerge-list {output.tmp_merge_file} --make-pgen --out {params.outfix}
+        plink2 --pmerge-list {output.tmp_merge_file} --maf 0.001 --threads {threads} --make-pgen --out {params.outfix}
         """
 
 
@@ -97,13 +97,17 @@ rule compute_pcs:
         remove_variants=temp("results/covariates/{project_name}.prune.out"),
         evecs="results/covariates/{project_name}.eigenvec",
         evals="results/covariates/{project_name}.eigenval",
+    resources:
+        time="1:00:00",
+        mem_mb="10G",
+    threads: 20
     params:
         npcs=20,
         outfix=lambda wildcards: f"results/covariates/{wildcards['project_name']}",
     shell:
         """
-        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --maf 0.05 --indep-pairwise 200 25 0.2 --out {params.outfix}
-        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --extract {output.keep_variants} --pca {params.npcs} approx --out {params.outfix}
+        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --threads {threads} --maf 0.01 --indep-pairwise 200 25 0.2 --out {params.outfix}
+        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --extract {output.keep_variants} --pca {params.npcs} approx --threads {threads} --out {params.outfix}
         """
 
 
@@ -116,12 +120,16 @@ rule king_related_individuals:
     output:
         king_includes=temp("results/covariates/{project_name}.king.cutoff.in.id"),
         king_excludes="results/covariates/{project_name}.king.cutoff.out.id",
+    resources:
+        time="1:00:00",
+        mem_mb="1G",
+    threads: 20
     params:
         outfix=lambda wildcards: f"results/covariates/{wildcards['project_name']}",
         king_thresh=0.125,
     shell:
         """
-        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --maf 0.05 --king-cutoff {params.king_thresh} --out {params.outfix}
+        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --threads {threads} --maf 0.01 --king-cutoff {params.king_thresh} --out {params.outfix}
         """
 
 
@@ -134,6 +142,9 @@ rule create_full_covariates:
         covars="results/covariates/{project_name}.covars.{format}.txt",
     wildcard_constraints:
         format="regenie|plink2",
+    resources:
+        time="0:30:00",
+        mem_mb="1G",
     params:
         plink_format=lambda wildcards: wildcards.format == "plink2",
     script:
@@ -147,6 +158,9 @@ rule create_full_quant_phenotypes:
         co_data=config["crossovers"],
     output:
         pheno="results/phenotypes/{project_name}.{format}.pheno",
+    resources:
+        time="0:30:00",
+        mem_mb="1G",
     params:
         plink_format=lambda wildcards: wildcards.format == "plink2",
     script:
@@ -154,8 +168,6 @@ rule create_full_quant_phenotypes:
 
 
 # ------ 3. Run GWAS using REGENIE across phenotypes ------ #
-
-
 rule create_sex_exclude_file:
     input:
         covar="results/covariates/{project_name}.covars.{format}.txt",
@@ -173,13 +185,13 @@ rule create_sex_exclude_file:
             exclude_sex_df = cov_df[cov_df.Sex == 0]
         else:
             exclude_sex_df = cov_df[cov_df.Sex == 1]
-        if ~snakemake.params["plink_format"]:
+        if ~params["plink_format"]:
             king_df.columns = ["FID", "IID"]
         concat_df = pd.concat([exclude_sex_df, king_df])
         if ~params["plink_format"]:
-            out_df = concat_df[["#FID", "IID"]].drop_duplicates()
-        else:
             out_df = concat_df[["FID", "IID"]].drop_duplicates()
+        else:
+            out_df = concat_df[["#FID", "IID"]].drop_duplicates()
         out_df.to_csv(output["sex_specific"], index=None, sep="\t")
 
 
@@ -197,6 +209,9 @@ rule regenie_step1:
             "results/gwas_output/regenie/{{project_name}}_{{sex}}_{{format}}_{pheno}.loco",
             pheno=["MeanCO", "VarCO", "RandPheno"]
         ),
+    resources:
+        time="2:00:00",
+        mem_mb="10G",
     wildcard_constraints:
         format="regenie"
     shell:
@@ -223,6 +238,9 @@ rule regenie_step2:
             "results/gwas_output/regenie/{{project_name}}_{{sex}}_{{format}}_{pheno}.regenie",
             pheno=["MeanCO", "VarCO", "RandPheno"]
         ),
+    resources:
+        time="2:00:00",
+        mem_mb="10G",
     wildcard_constraints:
         format="regenie"
     shell:
