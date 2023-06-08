@@ -60,19 +60,17 @@ def prepare_paired_data(
         assert baf2.size == baf3.size
         return mat_haps, pat_haps, baf1, baf2, baf3, pos
 
-
-def find_nearest_het(idx, pos, haps_focal, haps_alt):
+def find_nearest_het(idx, pos, haps):
     """Find the nearest heterozygotes to the estimated crossover position."""
-    assert idx >= 0 and idx <= haps_focal.shape[1]
-    assert pos.size == haps_focal.shape[1]
-    geno_focal = haps_focal[0, :] + haps_focal[1, :]
-    geno_alt = haps_alt[0, :] + haps_alt[1, :]
-    het_idx = np.where((geno_focal == 1) & ((geno_alt == 0) | (geno_alt == 2)))[0]
+    assert idx > 0 and idx < haps.shape[1]
+    assert pos.size == haps.shape[1]
+    geno_focal = haps[0, :] + haps[1, :]
+    het_idx = np.where((geno_focal == 1))[0]
     if idx < np.min(het_idx):
         left_pos = np.nan
         left_idx = np.nan
     else:
-        left_idx = het_idx[het_idx <= idx][-1]
+        left_idx = het_idx[het_idx < idx][-1]
         left_pos = pos[left_idx]
     if idx > np.max(het_idx):
         right_idx = np.nan
@@ -132,13 +130,13 @@ if __name__ == "__main__":
             )
             recomb_dict[c][f'{names[i]}+{names[j]}+{names[j2]}'] = {'pos': pos, 'path_01': refined_path_01, 'path_02': refined_path_02, 'pi0_01': pi0_01, 'pi0_02': pi0_02, 'sigma_01': sigma_01, 'sigma_02': sigma_02}
             for m in mat_rec:
-                _, left_pos, _, right_pos = find_nearest_het(m[0], pos, mat_haps, pat_haps)
+                _, left_pos, _, right_pos = find_nearest_het(m[0], pos, mat_haps)
                 rec_pos = pos[m[0]]
                 lines.append(
                     f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tmaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
                 )
             for p in pat_rec:
-                _, left_pos, _,  right_pos = find_nearest_het(p[0], pos, pat_haps, mat_haps)
+                _, left_pos, _,  right_pos = find_nearest_het(p[0], pos, pat_haps)
                 rec_pos = pos[p[0]]
                 lines.append(
                     f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tpaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
