@@ -131,7 +131,7 @@ rule create_full_covariates:
         evecs="results/covariates/{project_name}.eigenvec",
         metadata=config["metadata"],
     output:
-        "results/covariates/{project_name}.covars.{format}.txt",
+        covars="results/covariates/{project_name}.covars.{format}.txt",
     wildcard_constraints:
         format="regenie|plink2",
     params:
@@ -167,8 +167,8 @@ rule create_sex_exclude_file:
     params:
         plink_format=lambda wildcards: wildcards.format == "plink2",
     run:
-        cov_df = pd.read_csv(snakemake.input["covar"], sep="\t")
-        king_df = pd.read_csv(snakemake.input["king_excludes"], sep="\t")
+        cov_df = pd.read_csv(input["covar"], sep="\t")
+        king_df = pd.read_csv(input["king_excludes"], sep="\t")
         if wildcards.sex == "Male":
             exclude_sex_df = cov_df[cov_df.Sex == 0]
         else:
@@ -176,11 +176,11 @@ rule create_sex_exclude_file:
         if ~snakemake.params["plink_format"]:
             king_df.columns = ["FID", "IID"]
         concat_df = pd.concat([exclude_sex_df, king_df])
-        if ~snakemake.params["plink_format"]:
+        if ~params["plink_format"]:
             out_df = concat_df[["#FID", "IID"]].drop_duplicates()
         else:
             out_df = concat_df[["FID", "IID"]].drop_duplicates()
-        out_df.to_csv(snakemake.output["sex_specific"], index=None, sep="\t")
+        out_df.to_csv(output["sex_specific"], index=None, sep="\t")
 
 
 rule regenie_step1:

@@ -2,6 +2,7 @@
 
 import numpy as np 
 from scipy import stats
+import pandas as pd
 
 def mean_var_co_per_genome(df):
     """Compute the average number of crossovers per-chromosome for an individual."""

@@ -84,8 +84,10 @@ if __name__ == "__main__":
     family_data = load_baf_data(snakemake.input["baf_pkl"])
     names = [k for k in family_data.keys()]
     nsibs = len(names)
+    recomb_dict = {}
     lines = []
     for c in tqdm(snakemake.params["chroms"]):
+        pkl_dict[c] = {}
         for i in range(nsibs):
             j = (i + 1) % nsibs
             j2 = (i + 2) % nsibs
@@ -97,7 +99,7 @@ if __name__ == "__main__":
                 data_dict=family_data,
             )
             pi0_01, sigma_01 = hmm.est_sigma_pi0(
-                bafs=[baf0, baf1], mat_haps=mat_haps, pat_haps=pat_haps, r=1e-18
+               bafs=[baf0, baf1], mat_haps=mat_haps, pat_haps=pat_haps, r=1e-18
             )
             path_01, _, _, _ = hmm.viterbi_algorithm(
                 bafs=[baf0, baf1],
@@ -109,7 +111,7 @@ if __name__ == "__main__":
             )
             refined_path_01 = hmm.restrict_path(path_01)
             pi0_02, sigma_02 = hmm.est_sigma_pi0(
-                bafs=[baf0, baf2], mat_haps=mat_haps, pat_haps=pat_haps, r=1e-18
+               bafs=[baf0, baf2], mat_haps=mat_haps, pat_haps=pat_haps, r=1e-18
             )
             path_02, _, _, _ = hmm.viterbi_algorithm(
                 bafs=[baf0, baf2],
@@ -123,6 +125,7 @@ if __name__ == "__main__":
             mat_rec, pat_rec = hmm.isolate_recomb(
                 refined_path_01, refined_path_02, window=20
             )
+            recomb_dict[c][f'{names[i]}+{names[j]}+{names[j2]}'] = {'pos': pos, 'path_01': refined_path_01, 'path_02': refined_path_02, 'pi0_01': pi0_01, 'pi0_02': pi0_02, 'sigma_01': sigma_01, 'sigma_02': sigma_02}
             for m in mat_rec:
                 left, rec_pos, right = find_nearest_het(m[0], pos, mat_haps)
                 lines.append(
@@ -133,6 +136,9 @@ if __name__ == "__main__":
                 lines.append(
                     f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tpaternal\t{left}\t{rec_pos}\t{right}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
                 )
+    # Write out the path dictionary with the tracebacks 
+    pickle.dump(recomb_dict, gz.open(snakemake.output["recomb_paths"], "wb"))
+    # Write out the formal crossover spot output here 
     with open(snakemake.output["est_recomb"], "w") as out:
         out.write(
             "mother\tfather\tchild\tchrom\tcrossover_sex\tmin_pos\tavg_pos\tmax_pos\tavg_pi0\tavg_sigma\n"

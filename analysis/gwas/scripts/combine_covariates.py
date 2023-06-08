@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np 
 
 def generate_parent_meta(meta_df):
     for a in ["family_position", "array", "patient_age", "partner_age", "year"]:
