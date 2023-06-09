@@ -70,14 +70,23 @@ def find_nearest_het(idx, pos, haps):
         left_pos = np.nan
         left_idx = np.nan
     else:
-        left_idx = het_idx[het_idx < idx][-1]
-        left_pos = pos[left_idx]
+        try:
+            left_idx = het_idx[het_idx < idx][-1]
+            left_pos = pos[left_idx]
+        except IndexError:
+            # For recombinations at the very beginning of chromosomes
+            left_idx = 0
+            left_pos = pos[0]
     if idx > np.max(het_idx):
         right_idx = np.nan
         right_pos = np.nan
     else:
-        right_idx = het_idx[het_idx >= idx][0]
-        right_pos = pos[right_idx]
+        try:
+            right_idx = het_idx[het_idx >= idx][0]
+            right_pos = pos[right_idx]
+        except IndexError:
+            right_idx = pos.size - 1
+            right_pos = pos[-1]
     return left_idx, left_pos, right_idx, right_pos
 
 
