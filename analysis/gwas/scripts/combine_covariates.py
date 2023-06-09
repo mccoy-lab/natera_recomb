@@ -7,8 +7,8 @@ def generate_parent_meta(meta_df):
     parent_meta_df = meta_df[(meta_df.family_position == 'mother') | (meta_df.family_position == 'father')]
     parent_meta_df = parent_meta_df.groupby(['array', 'family_position']).agg(np.mean).reset_index()
     parent_meta_df = parent_meta_df.assign(sex = [0 if x == 'mother' else 1 for x in parent_meta_df['family_position']], age = [a if x == 'mother' else b for (x,a,b) in zip(parent_meta_df['family_position'], parent_meta_df['patient_age'], parent_meta_df['partner_age'])])
-    parent_meta_out_df = parent_meta_df[['array', 'array', 'sex', 'age', 'year']]
-    parent_meta_out_df.columns = ['FID', 'IID', 'Sex', 'Age', 'Year']
+    parent_meta_out_df = parent_meta_df[['array', 'array', 'sex', 'age']]
+    parent_meta_out_df.columns = ['FID', 'IID', 'Sex', 'Age']
     return parent_meta_out_df
 
 if __name__ == "__main__":

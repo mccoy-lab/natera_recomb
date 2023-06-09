@@ -12,9 +12,10 @@ from io import StringIO
 # ---- Parameters for inference in Natera Data ---- #
 configfile: "config.yaml"
 
+
 # Create the VCF data dictionary for each chromosome ...
 vcf_dict = {}
-chroms = [f"chr{i}" for i in range(19, 23)]
+chroms = [f"chr{i}" for i in range(20, 23)]
 for chrom in chroms:
     vcf_dict[
         chrom
@@ -31,10 +32,11 @@ localrules:
 rule all:
     input:
         expand(
-            "results/gwas_output/regenie/{project_name}_{sex}_{format}_{pheno}.regenie",
+            "results/gwas_output/regenie/{project_name}_{sex}_{format}_{pheno}.regenie.gz",
             project_name=config["project_name"],
             sex=["Male", "Female"],
-            pheno=["MeanCO", "VarCO", "RandPheno"], format='regenie'
+            pheno=["MeanCO", "VarCO", "RandPheno"],
+            format="regenie",
         ),
 
 
@@ -53,7 +55,7 @@ rule vcf2pgen:
     resources:
         time="1:00:00",
         mem_mb="8G",
-    threads: 20
+    threads: 24
     params:
         outfix=lambda wildcards: f"results/pgen_input/{wildcards.project_name}.{wildcards.chrom}",
     shell:
@@ -77,7 +79,7 @@ rule merge_full_pgen:
     resources:
         time="1:00:00",
         mem_mb="5G",
-    threads: 20
+    threads: 24
     shell:
         """
         for i in {chroms}; do echo \"results/pgen_input/{wildcards.project_name}.$i\" ; done > {output.tmp_merge_file}
@@ -100,7 +102,7 @@ rule compute_pcs:
     resources:
         time="1:00:00",
         mem_mb="10G",
-    threads: 20
+    threads: 24
     params:
         npcs=20,
         outfix=lambda wildcards: f"results/covariates/{wildcards['project_name']}",
@@ -205,18 +207,17 @@ rule regenie_step1:
         covar="results/covariates/{project_name}.covars.{format}.txt",
         sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
     output:
-        expand(
-            "results/gwas_output/regenie/{{project_name}}_{{sex}}_{{format}}_{pheno}.loco",
-            pheno=["MeanCO", "VarCO", "RandPheno"]
-        ),
+        loco_list="results/gwas_output/regenie/{project_name}_{sex}_{format}.list",
+        prs_list="results/gwas_output/regenie/{project_name}_{sex}_{format}_prs.list",
     resources:
-        time="2:00:00",
+        time="6:00:00",
         mem_mb="10G",
+    threads: 24
     wildcard_constraints:
-        format="regenie"
+        format="regenie",
     shell:
         """
-        regenie --step 1 --pgen results/pgen_input/{wildcards.project_name} --covarFile {input.covar} --phenoFile {input.pheno} --remove {input.sex_exclusion} --bsize 100 --lowmem --lowmem-prefix tmp_rg --out results/gwas_output/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}
+        regenie --step 1 --pgen results/pgen_input/{wildcards.project_name} --covarFile {input.covar} --phenoFile {input.pheno} --remove {input.sex_exclusion} --bsize 200 --apply-rint --print-prs --threads {threads} --lowmem --lowmem-prefix tmp_rg --out results/gwas_output/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}
         """
 
 
@@ -229,23 +230,21 @@ rule regenie_step2:
         pheno="results/phenotypes/{project_name}.{format}.pheno",
         covar="results/covariates/{project_name}.covars.{format}.txt",
         sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
-        loco_pred=expand(
-            "results/gwas_output/regenie/{{project_name}}_{{sex}}_{format}_{pheno}.loco",
-            pheno=["MeanCO", "VarCO", "RandPheno"], format='regenie'
-        ),
+        loco_pred="results/gwas_output/regenie/{project_name}_{sex}_{format}.list",
     output:
         expand(
-            "results/gwas_output/regenie/{{project_name}}_{{sex}}_{{format}}_{pheno}.regenie",
-            pheno=["MeanCO", "VarCO", "RandPheno"]
+            "results/gwas_output/regenie/{{project_name}}_{{sex}}_{{format}}_{pheno}.regenie.gz",
+            pheno=["MeanCO", "VarCO", "RandPheno"],
         ),
     resources:
-        time="2:00:00",
+        time="6:00:00",
         mem_mb="10G",
+    threads: 24
     wildcard_constraints:
-        format="regenie"
+        format="regenie",
     shell:
         """
-        regenie --step 2 --pgen results/pgen_input/{wildcards.project_name} --covarFile {input.covar} --phenoFile {input.pheno} --remove {input.sex_exclusion} --bsize 100 --lowmem --lowmem-prefix tmp_rg --out results/gwas_output/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}
+        regenie --step 2 --pgen results/pgen_input/{wildcards.project_name} --covarFile {input.covar} --phenoFile {input.pheno} --pred {input.loco_pred} --remove {input.sex_exclusion} --bsize 200 --apply-rint --threads {threads} --lowmem --lowmem-prefix tmp_rg --gz --out results/gwas_output/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}
         """
 
 
