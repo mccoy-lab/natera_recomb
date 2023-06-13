@@ -1,3 +1,4 @@
+#!python3
 import numpy as np
 import pandas as pd
 
@@ -7,7 +8,7 @@ configfile: "config.yaml"
 
 rule all:
     input:
-        "results/sims/total_co_sims.tsv",
+        "results/sims/total_co_sims.tsv.gz",
 
 
 rule sim_siblings:
@@ -122,7 +123,7 @@ rule collect_crossover_results:
             nsibs=config["co_sims"]["nsibs"],
         ),
     output:
-        tsv="results/sims/total_co_sims.tsv",
+        tsv="results/sims/total_co_sims.tsv.gz",
     run:
         dfs = []
         for fp in input.co_res:
