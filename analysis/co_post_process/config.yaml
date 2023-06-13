@@ -1,0 +1,5 @@
+metadata: "../../data/spectrum_metadata_merged.csv"
+crossover_data:
+  full_euploid: "../../sandbox/crossovers.euploid_only.061123.v5.tsv.gz"
+recomb_maps:
+  deCode_haldorsson19: "../../sandbox/aau1043_datas3.gz"
