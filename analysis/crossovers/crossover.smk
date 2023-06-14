@@ -172,7 +172,7 @@ rule estimate_recombination_euploid_trio:
         ),
     output:
         est_recomb="results/natera_inference/{mother}+{father}.est_recomb.tsv",
-        recomb_paths="results/natera_inference/{mother}+{father}.recomb_paths.pkl.gz"
+        recomb_paths="results/natera_inference/{mother}+{father}.recomb_paths.pkl.gz",
     params:
         chroms=chroms,
     resources:

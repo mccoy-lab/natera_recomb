@@ -60,6 +60,7 @@ def prepare_paired_data(
         assert baf2.size == baf3.size
         return mat_haps, pat_haps, baf1, baf2, baf3, pos
 
+
 def find_nearest_het(idx, pos, haps):
     """Find the nearest heterozygotes to the estimated crossover position."""
     assert idx > 0 and idx < haps.shape[1]
@@ -111,7 +112,7 @@ if __name__ == "__main__":
                 data_dict=family_data,
             )
             pi0_01, sigma_01 = hmm.est_sigma_pi0(
-               bafs=[baf0, baf1], mat_haps=mat_haps, pat_haps=pat_haps, r=1e-18
+                bafs=[baf0, baf1], mat_haps=mat_haps, pat_haps=pat_haps, r=1e-18
             )
             path_01, _, _, _ = hmm.viterbi_algorithm(
                 bafs=[baf0, baf1],
@@ -123,7 +124,7 @@ if __name__ == "__main__":
             )
             refined_path_01 = hmm.restrict_path(path_01)
             pi0_02, sigma_02 = hmm.est_sigma_pi0(
-               bafs=[baf0, baf2], mat_haps=mat_haps, pat_haps=pat_haps, r=1e-18
+                bafs=[baf0, baf2], mat_haps=mat_haps, pat_haps=pat_haps, r=1e-18
             )
             path_02, _, _, _ = hmm.viterbi_algorithm(
                 bafs=[baf0, baf2],
@@ -137,7 +138,15 @@ if __name__ == "__main__":
             mat_rec, pat_rec = hmm.isolate_recomb(
                 refined_path_01, refined_path_02, window=20
             )
-            recomb_dict[c][f'{names[i]}+{names[j]}+{names[j2]}'] = {'pos': pos, 'path_01': refined_path_01, 'path_02': refined_path_02, 'pi0_01': pi0_01, 'pi0_02': pi0_02, 'sigma_01': sigma_01, 'sigma_02': sigma_02}
+            recomb_dict[c][f"{names[i]}+{names[j]}+{names[j2]}"] = {
+                "pos": pos,
+                "path_01": refined_path_01,
+                "path_02": refined_path_02,
+                "pi0_01": pi0_01,
+                "pi0_02": pi0_02,
+                "sigma_01": sigma_01,
+                "sigma_02": sigma_02,
+            }
             for m in mat_rec:
                 _, left_pos, _, right_pos = find_nearest_het(m[0], pos, mat_haps)
                 rec_pos = pos[m[0]]
@@ -145,14 +154,14 @@ if __name__ == "__main__":
                     f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tmaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
                 )
             for p in pat_rec:
-                _, left_pos, _,  right_pos = find_nearest_het(p[0], pos, pat_haps)
+                _, left_pos, _, right_pos = find_nearest_het(p[0], pos, pat_haps)
                 rec_pos = pos[p[0]]
                 lines.append(
                     f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tpaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
                 )
-    # Write out the path dictionary with the viterbi traces 
+    # Write out the path dictionary with the viterbi traces
     pickle.dump(recomb_dict, gz.open(snakemake.output["recomb_paths"], "wb"))
-    # Write out the formal crossover spot output here 
+    # Write out the formal crossover spot output here
     with open(snakemake.output["est_recomb"], "w") as out:
         out.write(
             "mother\tfather\tchild\tchrom\tcrossover_sex\tmin_pos\tavg_pos\tmax_pos\tavg_pi0\tavg_sigma\n"

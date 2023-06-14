@@ -7,7 +7,7 @@ configfile: "config.yaml"
 rule all:
     input:
         expand(
-            "results/{name}.crossover_filt.{recmap}.tsv.gz",
+            "results/{name}.age_xo_interference.{recmap}.tsv",
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
         ),
@@ -44,17 +44,18 @@ rule interpolate_co_locations:
 # ------- Analysis 1. Estimate Crossover Interference Stratified by Age & Sex -------- #
 rule age_sex_stratified_co_interference:
     input:
-      metadata = config["metadata"]
-      co_map_interp="results/{name}.crossover_filt.{recmap}.tsv.gz",
+        metadata=config["metadata"],
+        co_map_interp="results/{name}.crossover_filt.{recmap}.tsv.gz",
+        recmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
     output:
-      age_sex_interference = "results/{name}.age_xo_interference.tsv"
+        age_sex_interference="results/{name}.age_xo_interference.{recmap}.tsv",
     params:
-      nbins = 10
+        nbins=10,
+        nboots=5,
+        seed=42,
     script:
-      "scripts/est_age_strat_xo.py"
+        "scripts/est_age_strat_xo.py"
 
 
 # ------- Analysis 2. Posterior estimates of CO-interference across individuals. ------- #
-
-
 # ------- Analysis 3. Estimation of sex-specific recombination maps from crossover data ------ #
