@@ -5,32 +5,36 @@ import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 from tqdm import tqdm
 
-# Import the xoi inference here ...
+# Import the xoi inference package here 
 xoi = importr("xoi")
 
 
 def create_age_tranches(samples, ages, bins=10):
     """Split age of samples by some amount."""
     assert samples.size == ages.size
+    assert samples.ndim == ages.ndim
+    assert samples.ndim == 1
     nquant_space = np.linspace(0, 1, num=bins)
     age_tranches = []
-    samples = []
+    sample_tranches = []
     for i in range(1, bins):
         q1, q2 = nquant_space[i - 1], nquant_space[i]
         age_q1, age_q2 = np.quantile(ages, q1), np.quantile(ages, q2)
+        print(age_q1, age_q2)
         age_tranches.append((age_q1, age_q2))
         idx = np.where((ages >= age_q1) & (ages < age_q2))[0]
+        print(idx)
         cur_samples = samples[idx]
-        samples.append(cur_samples)
-    return age_tranches, samples
+        sample_tranches.append(cur_samples)
+    return age_tranches, sample_tranches
 
 
 def create_xo_data(co_df, samples, sex="maternal"):
     """Create crossover dataset for inference of xo-interference."""
     if sex == "maternal":
-        cur_df = co_df[np.isin(co_df.mother, samples) & co_df.crossover_sex == sex]
+        cur_df = co_df[np.isin(co_df.mother, samples) & (co_df.crossover_sex == sex)]
     elif sex == "paternal":
-        cur_df = co_df[np.isin(co_df.father, samples) & co_df.crossover_sex == sex]
+        cur_df = co_df[np.isin(co_df.father, samples) & (co_df.crossover_sex == sex)]
     else:
         raise ValueError("sex must be either maternal or paternal.")
     xo_data_df = (
@@ -87,16 +91,16 @@ if __name__ == "__main__":
     unique_mothers = np.unique(crossover_df.mother.values)
     mother_df = meta_df[np.isin(meta_df.array, unique_mothers)][
         ["array", "patient_age"]
-    ]
-    age_tranches, samples = create_age_tranches(
-        mother_df.array.values,
-        mother_df.patient_age.values,
+    ].dropna()
+    age_tranches, sample_tranches = create_age_tranches(
+        samples=mother_df.array.values,
+        ages=mother_df.patient_age.values,
         bins=snakemake.params["nbins"],
     )
     mat_df = []
-    for i in range(len(samples)):
+    for i in range(len(sample_tranches)):
         (min_age, max_age) = age_tranches[i]
-        cur_samples = samples[i]
+        cur_samples = sample_tranches[i]
         xo_data_df = create_xo_data(crossover_df, cur_samples, sex="maternal")
         for c in tqdm(chroms):
             nu_hat, nu_std, p_hat, p_std = bootstrap_infer_xo(
@@ -135,16 +139,16 @@ if __name__ == "__main__":
     unique_fathers = np.unique(crossover_df.father.values)
     father_df = meta_df[np.isin(meta_df.array, unique_fathers)][
         ["array", "partner_age"]
-    ]
-    age_tranches, samples = create_age_tranches(
+    ].dropna()
+    age_tranches, sample_tranches = create_age_tranches(
         father_df.array.values,
         father_df.partner_age.values,
         bins=snakemake.params["nbins"],
     )
     pat_df = []
-    for i in range(len(samples)):
+    for i in range(len(sample_tranches)):
         (min_age, max_age) = age_tranches[i]
-        cur_samples = samples[i]
+        cur_samples = sample_tranches[i]
         xo_data_df = create_xo_data(crossover_df, cur_samples, sex="paternal")
         for c in tqdm(chroms):
             nu_hat, nu_std, p_hat, p_std = bootstrap_infer_xo(
