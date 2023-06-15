@@ -59,8 +59,6 @@ def bootstrap_infer_xo(xo_data_df, chrom="chr1", chrom_len=267.77, nboots=50, se
     # NOTE: we also limit values that are beyond the interpolation range
     xo_list = xo_data_df[xo_data_df.chrom == chrom].avg_pos_cM.values.tolist()
     xo_list = [np.unique(x).tolist() for x in xo_list]
-    # true_len = float(np.max([np.max(x) for x in xo_list]))
-    # min_val = float(np.min([np.min(x) for x in xo_list]))
     npts = len(xo_list)
     try:
         mle_est = xoi.fitStahl(xo_list, chrlen=chrom_len, verbose=False)
@@ -92,7 +90,7 @@ if __name__ == "__main__":
     # Read in the meta-data & crossover information
     chroms = [f"chr{x}" for x in range(1, 23)]
     meta_df = pd.read_csv(snakemake.input["metadata"])
-    crossover_df = pd.read_csv(snakemake.input["co_map_interp"], nrows=1000, sep="\t")
+    crossover_df = pd.read_csv(snakemake.input["co_map_interp"], sep="\t")
     recmap_df = pd.read_csv(snakemake.input["recmap"], comment="#", sep="\t")
     recmap_df.columns = ["chrom", "begin", "end", "cMperMb", "cM"]
     chrom_len = {}
@@ -114,27 +112,26 @@ if __name__ == "__main__":
         (min_age, max_age) = age_tranches[i]
         cur_samples = sample_tranches[i]
         xo_data_df = create_xo_data(crossover_df, cur_samples, sex="maternal")
-        for c in tqdm(chroms):
-            nu_hat, nu_std, p_hat, p_std = bootstrap_infer_xo(
-                xo_data_df,
-                chrom=c,
-                chrom_len=chrom_len[c],
-                nboots=snakemake.params["nboots"],
-                seed=snakemake.params["seed"],
-            )
-            mat_df.append(
-                [
-                    "maternal",
-                    min_age,
-                    max_age,
-                    len(cur_samples),
-                    c,
-                    nu_hat,
-                    nu_std,
-                    p_hat,
-                    p_std,
-                ]
-            )
+        nu_hat, nu_std, p_hat, p_std = bootstrap_infer_xo(
+            xo_data_df,
+            chrom=snakemake.wildcards["chrom"],
+            chrom_len=chrom_len[snakemake.wildcards["chrom"]],
+            nboots=snakemake.params["nboots"],
+            seed=snakemake.params["seed"],
+        )
+        mat_df.append(
+            [
+                "maternal",
+                min_age,
+                max_age,
+                len(cur_samples),
+                c,
+                nu_hat,
+                nu_std,
+                p_hat,
+                p_std,
+            ]
+        )
     mat_df = pd.DataFrame(mat_df)
     mat_df.columns = [
         "sex",
@@ -162,27 +159,26 @@ if __name__ == "__main__":
         (min_age, max_age) = age_tranches[i]
         cur_samples = sample_tranches[i]
         xo_data_df = create_xo_data(crossover_df, cur_samples, sex="paternal")
-        for c in tqdm(chroms):
-            nu_hat, nu_std, p_hat, p_std = bootstrap_infer_xo(
-                xo_data_df,
-                chrom=c,
-                chrom_len=chrom_len[c],
-                nboots=snakemake.params["nboots"],
-                seed=snakemake.params["seed"],
-            )
-            pat_df.append(
-                [
-                    "paternal",
-                    min_age,
-                    max_age,
-                    len(cur_samples),
-                    c,
-                    nu_hat,
-                    nu_std,
-                    p_hat,
-                    p_std,
-                ]
-            )
+        nu_hat, nu_std, p_hat, p_std = bootstrap_infer_xo(
+            xo_data_df,
+            chrom=snakemake.wildcards["chrom"],
+            chrom_len=chrom_len[snakemake.wildcards["chrom"]],
+            nboots=snakemake.params["nboots"],
+            seed=snakemake.params["seed"],
+        )
+        pat_df.append(
+            [
+                "paternal",
+                min_age,
+                max_age,
+                len(cur_samples),
+                c,
+                nu_hat,
+                nu_std,
+                p_hat,
+                p_std,
+            ]
+        )
     pat_df = pd.DataFrame(pat_df)
     pat_df.columns = [
         "sex",

@@ -3,7 +3,7 @@ import pandas as pd
 from tqdm import tqdm
 
 if __name__ == "__main__":
-    co_df = pd.read_csv(snakemake.input["co_map_interp"], sep="\t")
+    co_df = pd.read_csv(snakemake.input["co_map"], sep="\t")
     sex_spec_co_df = co_df[co_df.crossover_sex == snakemake.params["sex"]]
 
     # Estimate the events files per-chromosome ...
@@ -14,5 +14,5 @@ if __name__ == "__main__":
         .dropna()
         .astype(int)
     )
-    fname = f"results/{snakemake.wildcards['sex']}_genmap/{snakemake.wildcards['name']}.events.{snakemake.wildcards['recmap']}.{snakemake.wildcards['chrom']}.{snakemake.wildcards['sex']}.txt"
+    fname = f"results/{snakemake.wildcards['sex']}_genmap/{snakemake.wildcards['name']}.events.{snakemake.wildcards['chrom']}.{snakemake.wildcards['sex']}.txt"
     sex_spec_co_chrom_df.to_csv(fname, index=None, header=None, sep="\t")

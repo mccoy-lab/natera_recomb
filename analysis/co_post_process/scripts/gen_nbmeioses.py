@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 def isolate_regions(min_pos, max_pos, nsplit=3, use_raw=False):
     """Isolate the key positions."""
-    raw_pos = np.sort(min_pos.tolist() + max_pos.tolist()).astype(int)
+    raw_pos = np.unique(np.sort(min_pos.tolist() + max_pos.tolist())).astype(int)
     split_pos = []
     for i, j in zip(raw_pos[:-1], raw_pos[1:]):
         split_pos.append(np.linspace(i, j, nsplit, dtype=int))
@@ -21,7 +21,7 @@ def isolate_regions(min_pos, max_pos, nsplit=3, use_raw=False):
 
 
 if __name__ == "__main__":
-    co_df = pd.read_csv(snakemake.input["co_map_interp"], sep="\t")
+    co_df = pd.read_csv(snakemake.input["co_map"], sep="\t")
     sex_spec_co_df = co_df[co_df.crossover_sex == snakemake.params["sex"]]
     nmeioses = np.unique(sex_spec_co_df.child.values).size
 
@@ -38,5 +38,5 @@ if __name__ == "__main__":
         use_raw=snakemake.params["use_raw"],
     )
     region_chrom_df["nbmeioses"] = nmeioses
-    fname = f"results/{snakemake.wildcards['sex']}_genmap/{snakemake.wildcards['name']}.nbmeioses.{snakemake.wildcards['recmap']}.{snakemake.wildcards['chrom']}.{snakemake.wildcards['sex']}.txt"
+    fname = f"results/{snakemake.wildcards['sex']}_genmap/{snakemake.wildcards['name']}.nbmeioses.{snakemake.wildcards['chrom']}.{snakemake.wildcards['sex']}.{snakemake.wildcards['raw']}.txt"
     region_chrom_df.to_csv(fname, index=None, header=None, sep="\t")

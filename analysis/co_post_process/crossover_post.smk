@@ -16,16 +16,17 @@ chroms = [f"chr{i}" for i in range(1, 23)]
 
 rule all:
     input:
-        # expand(
-        #     "results/{name}.age_xo_interference.{recmap}.tsv",
-        #     name=config["crossover_data"].keys(),
-        #     recmap=config["recomb_maps"].keys(),
-        # ),
         expand(
-            "results/{sex}_genmap/{name}.{recmap}.{chrom}.{sex}-rates.txt",
-            sex="maternal",
+            "results/{name}.age_xo_interference.{recmap}.{chrom}.tsv",
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
+            chrom="chr22",
+        ),
+        expand(
+            "results/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-rates.txt",
+            sex=["maternal", "paternal"],
+            raw=["raw", "split"],
+            name=config["crossover_data"].keys(),
             chrom="chr22",
         ),
 
@@ -65,7 +66,7 @@ rule age_sex_stratified_co_interference:
         co_map_interp="results/{name}.crossover_filt.{recmap}.tsv.gz",
         recmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
     output:
-        age_sex_interference="results/{name}.age_xo_interference.{recmap}.tsv",
+        age_sex_interference="results/{name}.age_xo_interference.{recmap}.{chrom}.tsv",
     params:
         nbins=10,
         nboots=5,
@@ -81,9 +82,9 @@ rule age_sex_stratified_co_interference:
 rule split_sex_specific_co_data:
     """Splits crossovers into maternal/paternal events."""
     input:
-        co_map_interp="results/{name}.crossover_filt.{recmap}.tsv.gz",
+        co_map="results/{name}.crossover_filt.tsv.gz",
     output:
-        "results/{sex}_genmap/{name}.events.{recmap}.{chrom}.{sex}.txt",
+        "results/{sex}_genmap/{name}.events.{chrom}.{sex}.txt",
     wildcard_constraints:
         sex="maternal|paternal",
     params:
@@ -95,32 +96,32 @@ rule split_sex_specific_co_data:
 rule setup_intervals_co_data:
     """Setup intervals on which to estimate recombination rates."""
     input:
-        co_map_interp="results/{name}.crossover_filt.{recmap}.tsv.gz",
-        recmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
+        co_map="results/{name}.crossover_filt.tsv.gz",
     output:
-        "results/{sex}_genmap/{name}.nbmeioses.{recmap}.{chrom}.{sex}.txt",
+        "results/{sex}_genmap/{name}.nbmeioses.{chrom}.{sex}.{raw}.txt",
     wildcard_constraints:
         sex="maternal|paternal",
+        raw="raw|split",
     params:
         sex=lambda wildcards: wildcards.sex,
-        nsplit=3,
-        use_raw=True,
+        nsplit=5,
+        use_raw=lambda wildcards: wildcards.raw == "raw",
     script:
         "scripts/gen_nbmeioses.py"
 
 
 rule est_recomb_rate_rmcmc:
     input:
-        events_file="results/{sex}_genmap/{name}.events.{recmap}.{chrom}.{sex}.txt",
-        nbmeioses_file="results/{sex}_genmap/{name}.nbmeioses.{recmap}.{chrom}.{sex}.txt",
+        events_file="results/{sex}_genmap/{name}.events.{chrom}.{sex}.txt",
+        nbmeioses_file="results/{sex}_genmap/{name}.nbmeioses.{chrom}.{sex}.{raw}.txt",
         rMCMC="./rMCMC/rMCMC/rMCMC",
     output:
-        rates_out="results/{sex}_genmap/{name}.{recmap}.{chrom}.{sex}-rates.txt",
-        events_out="results/{sex}_genmap/{name}.{recmap}.{chrom}.{sex}-events.txt",
+        rates_out="results/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-rates.txt",
+        events_out="results/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-events.txt",
     params:
-        outfix=lambda wildcards: f"results/{wildcards.sex}_genmap/{wildcards.name}.{wildcards.recmap}.{wildcards.chrom}.{wildcards.sex}",
+        outfix=lambda wildcards: f"results/{wildcards.sex}_genmap/{wildcards.name}.{wildcards.chrom}.{wildcards.sex}.{wildcards.raw}",
         nmeioses=lambda wildcards: pd.read_csv(
-            f"results/{wildcards.sex}_genmap/{wildcards.name}.nbmeioses.{wildcards.recmap}.{wildcards.chrom}.{wildcards.sex}.txt",
+            f"results/{wildcards.sex}_genmap/{wildcards.name}.nbmeioses.{wildcards.chrom}.{wildcards.sex}.{wildcards.raw}.txt",
             nrows=1,
             sep="\s",
         ).values[:, 2][0],
