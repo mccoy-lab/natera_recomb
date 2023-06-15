@@ -17,17 +17,17 @@ chroms = [f"chr{i}" for i in range(1, 23)]
 rule all:
     input:
         expand(
-            "results/{name}.age_xo_interference.{recmap}.{chrom}.tsv",
+            "results/xo_interference/{name}.age_xo_interference.{recmap}.{chrom}.tsv",
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
-            chrom="chr22",
+            chrom=["chr4", "chr10", "chr22"]
         ),
         expand(
             "results/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-rates.txt",
             sex=["maternal", "paternal"],
             raw=["raw", "split"],
             name=config["crossover_data"].keys(),
-            chrom="chr22",
+            chrom=["chr4", "chr10", "chr22"],
         ),
 
 
@@ -66,7 +66,7 @@ rule age_sex_stratified_co_interference:
         co_map_interp="results/{name}.crossover_filt.{recmap}.tsv.gz",
         recmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
     output:
-        age_sex_interference="results/{name}.age_xo_interference.{recmap}.{chrom}.tsv",
+        age_sex_interference="results/xo_interference/{name}.age_xo_interference.{recmap}.{chrom}.tsv",
     params:
         nbins=10,
         nboots=5,
