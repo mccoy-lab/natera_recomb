@@ -1,3 +1,4 @@
+#!python3
 import numpy as np
 import pandas as pd
 
@@ -82,10 +83,7 @@ rule split_sex_specific_co_data:
     input:
         co_map_interp="results/{name}.crossover_filt.{recmap}.tsv.gz",
     output:
-        expand(
-            "results/{{sex}}_genmap/{{name}}.events.{{recmap}}.{chrom}.{{sex}}.txt",
-            chrom=chroms,
-        ),
+        "results/{sex}_genmap/{name}.events.{recmap}.{chrom}.{sex}.txt",
     wildcard_constraints:
         sex="maternal|paternal",
     params:
@@ -95,19 +93,18 @@ rule split_sex_specific_co_data:
 
 
 rule setup_intervals_co_data:
-    """Setup data for intervals on which to estimate recombination rates."""
+    """Setup intervals on which to estimate recombination rates."""
     input:
         co_map_interp="results/{name}.crossover_filt.{recmap}.tsv.gz",
         recmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
     output:
-        expand(
-            "results/{{sex}}_genmap/{{name}}.nbmeioses.{{recmap}}.{chrom}.{{sex}}.txt",
-            chrom=chroms,
-        ),
+        "results/{sex}_genmap/{name}.nbmeioses.{recmap}.{chrom}.{sex}.txt",
     wildcard_constraints:
         sex="maternal|paternal",
     params:
         sex=lambda wildcards: wildcards.sex,
+        nsplit=3,
+        use_raw=True,
     script:
         "scripts/gen_nbmeioses.py"
 
@@ -121,7 +118,7 @@ rule est_recomb_rate_rmcmc:
         rates_out="results/{sex}_genmap/{name}.{recmap}.{chrom}.{sex}-rates.txt",
         events_out="results/{sex}_genmap/{name}.{recmap}.{chrom}.{sex}-events.txt",
     params:
-        outfix=lambda wildcards: "results/{wildcards.sex}_genmap/{wildcards.name}.{wildcards.recmap}.{wildcards.chrom}.{wildcards.sex}",
+        outfix=lambda wildcards: f"results/{wildcards.sex}_genmap/{wildcards.name}.{wildcards.recmap}.{wildcards.chrom}.{wildcards.sex}",
         nmeioses=lambda wildcards: pd.read_csv(
             f"results/{wildcards.sex}_genmap/{wildcards.name}.nbmeioses.{wildcards.recmap}.{wildcards.chrom}.{wildcards.sex}.txt",
             nrows=1,

@@ -2,16 +2,41 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+
+def isolate_regions(min_pos, max_pos, nsplit=3, use_raw=False):
+    """Isolate the key positions."""
+    raw_pos = np.sort(min_pos.tolist() + max_pos.tolist()).astype(int)
+    split_pos = []
+    for i, j in zip(raw_pos[:-1], raw_pos[1:]):
+        split_pos.append(np.linspace(i, j, nsplit, dtype=int))
+    pos = np.unique(np.sort(np.hstack(split_pos))).astype(int)
+    if use_raw:
+        starts = raw_pos[:-1]
+        ends = raw_pos[1:]
+    else:
+        starts = pos[:-1]
+        ends = pos[1:]
+    region_df = pd.DataFrame({"begin": starts, "ends": ends})
+    return region_df
+
+
 if __name__ == "__main__":
     co_df = pd.read_csv(snakemake.input["co_map_interp"], sep="\t")
     sex_spec_co_df = co_df[co_df.crossover_sex == snakemake.params["sex"]]
-    recmap_df = pd.read_csv(snakemake.input["recmap"], comment="#", sep="\t")
-    recmap_df.columns = ["chrom", "begin", "end", "cMperMb", "cM"]
     nmeioses = np.unique(sex_spec_co_df.child.values).size
 
     # Estimate the events files per-chromosome ...
-    for c in tqdm(np.unique(sex_spec_co_df.chrom.values)):
-        region_chrom_df = recmap_df[recmap_df.chrom == c][["begin", "end"]]
-        region_chrom_df["nbmeioses"] = nmeioses
-        fname = f"results/{snakemake.wildcards['sex']}_genmap/{snakemake.wildcards['name']}.nbmeioses.{snakemake.wildcards['recmap']}.{c}.{snakemake.wildcards['sex']}.txt"
-        region_chrom_df.to_csv(fname, index=None, header=None, sep="\t")
+    # NOTE: this should be based on SNP-locations I think
+    cur_df = sex_spec_co_df[sex_spec_co_df.chrom == snakemake.wildcards["chrom"]][
+        ["min_pos", "max_pos"]
+    ].dropna()
+    # We could use the SNP
+    region_chrom_df = isolate_regions(
+        cur_df.min_pos.values,
+        cur_df.max_pos.values,
+        nsplit=snakemake.params["nsplit"],
+        use_raw=snakemake.params["use_raw"],
+    )
+    region_chrom_df["nbmeioses"] = nmeioses
+    fname = f"results/{snakemake.wildcards['sex']}_genmap/{snakemake.wildcards['name']}.nbmeioses.{snakemake.wildcards['recmap']}.{snakemake.wildcards['chrom']}.{snakemake.wildcards['sex']}.txt"
+    region_chrom_df.to_csv(fname, index=None, header=None, sep="\t")

@@ -7,9 +7,12 @@ if __name__ == "__main__":
     sex_spec_co_df = co_df[co_df.crossover_sex == snakemake.params["sex"]]
 
     # Estimate the events files per-chromosome ...
-    for c in tqdm(np.unique(sex_spec_co_df.chrom.values)):
-        sex_spec_co_chrom_df = sex_spec_co_df[sex_spec_co_df.chrom == c][
+    sex_spec_co_chrom_df = (
+        sex_spec_co_df[sex_spec_co_df.chrom == snakemake.wildcards["chrom"]][
             ["min_pos", "max_pos"]
-        ].dropna().astype(int)
-        fname = f"results/{snakemake.wildcards['sex']}_genmap/{snakemake.wildcards['name']}.events.{snakemake.wildcards['recmap']}.{c}.{snakemake.wildcards['sex']}.txt"
-        sex_spec_co_chrom_df.to_csv(fname, index=None, header=None, sep="\t")
+        ]
+        .dropna()
+        .astype(int)
+    )
+    fname = f"results/{snakemake.wildcards['sex']}_genmap/{snakemake.wildcards['name']}.events.{snakemake.wildcards['recmap']}.{snakemake.wildcards['chrom']}.{snakemake.wildcards['sex']}.txt"
+    sex_spec_co_chrom_df.to_csv(fname, index=None, header=None, sep="\t")
