@@ -13,7 +13,10 @@ if __name__ == "__main__":
     for c in tqdm(unique_chroms):
         cur_df = recmap_df[recmap_df.chrom == c]
         interp_dict[c] = interp1d(
-            cur_df.begin.values, cur_df.cM.values, bounds_error=False, fill_value=(0,cur_df.cM.values.max())
+            cur_df.begin.values,
+            cur_df.cM.values,
+            bounds_error=False,
+            fill_value=(0, cur_df.cM.values.max()),
         )
 
     # Creating the interpolated points

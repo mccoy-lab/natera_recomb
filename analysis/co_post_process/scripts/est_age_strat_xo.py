@@ -5,7 +5,7 @@ import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 from tqdm import tqdm
 
-# Import the xoi inference package here 
+# Import the xoi inference package here
 xoi = importr("xoi")
 
 
@@ -23,7 +23,6 @@ def create_age_tranches(samples, ages, bins=10):
         print(age_q1, age_q2)
         age_tranches.append((age_q1, age_q2))
         idx = np.where((ages >= age_q1) & (ages < age_q2))[0]
-        # print(idx)
         cur_samples = samples[idx]
         sample_tranches.append(cur_samples.tolist())
     return age_tranches, sample_tranches
@@ -56,28 +55,36 @@ def bootstrap_infer_xo(xo_data_df, chrom="chr1", chrom_len=267.77, nboots=50, se
     assert nboots > 0
     assert seed > 0
     np.random.seed(seed)
-    # NOTE: we don't conduct sampling from the rate of cM positions ..
+    # NOTE: we don't conduct sampling from the window of cM positions
+    # NOTE: we also limit values that are beyond the interpolation range
     xo_list = xo_data_df[xo_data_df.chrom == chrom].avg_pos_cM.values.tolist()
-    true_len = float(np.max([np.max(x) for x in xo_list]))
-    min_val = float(np.min([np.min(x) for x in xo_list]))
-    # print(true_len, chrom_len, min_val)
+    xo_list = [np.unique(x).tolist() for x in xo_list]
+    # true_len = float(np.max([np.max(x) for x in xo_list]))
+    # min_val = float(np.min([np.min(x) for x in xo_list]))
     npts = len(xo_list)
-    mle_est = xoi.fitStahl(xo_list, chrlen=chrom_len, verbose=False)
-    nu_hat = mle_est[0]
-    p_hat = mle_est[1]
-    print(mle_est)
+    try:
+        mle_est = xoi.fitStahl(xo_list, chrlen=chrom_len, verbose=False)
+        nu_hat = mle_est[0]
+        p_hat = mle_est[1]
+    except:
+        nu_hat = np.nan
+        p_hat = np.nan
     nu_boots = np.zeros(nboots)
     p_boots = np.zeros(nboots)
     for i in tqdm(range(nboots)):
         ix = np.random.choice(np.arange(npts), size=npts)
         xo_boot = [xo_list[j] for j in ix]
-        boot_est = xoi.fitStahl(xo_boot, chrlen=chrom_len, verbose=False)
-        print(boot_est)
-        nu_boots[i] = boot_est[0]
-        p_boots[i] = boot_est[1]
+        try:
+            boot_est = xoi.fitStahl(xo_boot, chrlen=chrom_len, verbose=False)
+            print(boot_est)
+            nu_boots[i] = boot_est[0]
+            p_boots[i] = boot_est[1]
+        except:
+            nu_boots[i] = np.nan
+            p_boots[i] = np.nan
     # NOTE: this is the standard deviation (not necessarily the std.err)
-    nu_std = np.std(nu_boots)
-    p_std = np.std(p_boots)
+    nu_std = np.nanstd(nu_boots)
+    p_std = np.nanstd(p_boots)
     return nu_hat, nu_std, p_hat, p_std
 
 
@@ -85,7 +92,7 @@ if __name__ == "__main__":
     # Read in the meta-data & crossover information
     chroms = [f"chr{x}" for x in range(1, 23)]
     meta_df = pd.read_csv(snakemake.input["metadata"])
-    crossover_df = pd.read_csv(snakemake.input["co_map_interp"], nrows=10000, sep="\t")
+    crossover_df = pd.read_csv(snakemake.input["co_map_interp"], nrows=1000, sep="\t")
     recmap_df = pd.read_csv(snakemake.input["recmap"], comment="#", sep="\t")
     recmap_df.columns = ["chrom", "begin", "end", "cMperMb", "cM"]
     chrom_len = {}
