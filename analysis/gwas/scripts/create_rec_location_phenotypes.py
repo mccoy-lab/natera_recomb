@@ -11,10 +11,12 @@ def centromere_dist(chrom, pos, centromere_dict):
     dist = np.min(np.abs(pos - pts))
     return dist
 
+
 def telomere_dist(chrom, pos, telomere_dict):
     pts = np.array([telomere_dict["start"][chrom], telomere_dict["end"][chrom]])
     dist = np.min(np.abs(pos - pts))
     return dist
+
 
 def avg_dist_centromere(df, centromere_df):
     """Compute the average distance in bp from centromere of the nearest crossover."""
@@ -51,6 +53,7 @@ def avg_dist_centromere(df, centromere_df):
     father_df.columns = ["IID", "FID", "CentromereDist"]
     tot_df = pd.concat(mother_df, father_df)
     return tot_df
+
 
 def avg_dist_telomere(df, telomere_df):
     """Compute the average distance in bp from the telomeres of the nearest crossover."""
@@ -92,13 +95,11 @@ def hotspot_occupancy(df, hotspot_df):
     pass
 
 
-def avg_replication_timing(df, rep_timing_df)
-    pass
-
-
 if __name__ == "__main__":
     """Create several location-based phenotypes for analysis of recombination."""
     co_df = pd.read_csv(snakemake.input["co_data"], sep="\t")
+    centromere_df = pd.read_csv(snakemake.input["centromeres"], sep="\t")
+    telomere_df = pd.read_csv(snakemake.input["telomeres"], sep="\t")
     mean_R_df = mean_var_co_per_genome(co_df)
     rand_df = random_pheno(co_df)
     merged_df = mean_R_df.merge(rand_df)
