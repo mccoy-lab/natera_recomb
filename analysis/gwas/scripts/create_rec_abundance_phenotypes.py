@@ -36,7 +36,6 @@ def mean_var_co_per_genome(df):
     out_df.columns = ["FID", "IID", "MeanCO", "VarCO"]
     return out_df
 
-
 def random_pheno(df, seed=42):
     """Create a random phenotype as a test for main analysis."""
     assert "mother" in df.columns
@@ -55,6 +54,13 @@ def random_pheno(df, seed=42):
     out_df = pd.DataFrame(data)
     out_df.columns = ["FID", "IID", "RandPheno"]
     return out_df
+
+
+
+
+
+
+
 
 
 if __name__ == "__main__":
