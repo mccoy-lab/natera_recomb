@@ -1,7 +1,12 @@
 project_name: "natera_recombination_gwas"
 metadata: "../../data/spectrum_metadata_merged.csv"
-crossovers: "../../sandbox/crossovers.euploid_only.060223.v3.tsv.gz"
+crossovers: "../../sandbox/crossovers.euploid_only.061123.v5.tsv.gz"
+recomb_map: "../../data/genmaps/halldorsson19/aau1043_datas3.gz"
+bed_files:
+    centromeres: "../../data/gaps/centromeres_grch38.bed"
+    telomeres: "../../data/gaps/telomeres_grch38.bed"
+    hotspots: "../../data/gaps/rec_hotspots_grch38.bed"
 datadir: "/data/rmccoy22/natera_spectrum/genotypes/imputed_parents_031423/"
 methods:
-  # - "plink2"
+  - "plink2"
   - "regenie"

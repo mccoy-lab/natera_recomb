@@ -163,10 +163,41 @@ rule create_full_covariates:
 
 
 # ------ 2. Create the underlying phenotypes ------ #
-rule create_full_quant_phenotypes:
+rule create_rec_abundance_phenotypes:
+    """Create the overall abundance phenotypes."""
+    input:
+        co_data=config["crossovers"],
+    output:
+        pheno="results/phenotypes/{project_name}.{format}.abundance.pheno",
+    resources:
+        time="0:30:00",
+        mem_mb="1G",
+    params:
+        plink_format=lambda wildcards: wildcards.format == "plink2",
+    script:
+        "scripts/create_rec_abundance_phenotypes.py"
+
+
+rule create_rec_location_phenotypes:
     """Create the full quantitative phenotype."""
     input:
         co_data=config["crossovers"],
+    output:
+        pheno="results/phenotypes/{project_name}.{format}.location.pheno",
+    resources:
+        time="0:30:00",
+        mem_mb="1G",
+    params:
+        plink_format=lambda wildcards: wildcards.format == "plink2",
+    script:
+        "scripts/create_rec_location_phenotypes.py"
+
+
+rule combine_phenotypes:
+    """Create the full quantitative phenotype."""
+    input:
+        abundance_pheno="results/phenotypes/{project_name}.{format}.abundance.pheno",
+        location_pheno="results/phenotypes/{project_name}.{format}.location.pheno",
     output:
         pheno="results/phenotypes/{project_name}.{format}.pheno",
     resources:
@@ -174,8 +205,11 @@ rule create_full_quant_phenotypes:
         mem_mb="1G",
     params:
         plink_format=lambda wildcards: wildcards.format == "plink2",
-    script:
-        "scripts/create_rec_phenotypes.py"
+    run:
+        abundance_df = pd.read_csv(input.abundance_pheno, sep="\t")
+        location_df = pd.read_csv(input.location_pheno, sep="\t")
+        pheno_df = abundance_df.merge(location_df)
+        pheno_df.to_csv(output.pheno, sep="\t", index=None)
 
 
 # ------ 3. Run GWAS using REGENIE across phenotypes ------ #

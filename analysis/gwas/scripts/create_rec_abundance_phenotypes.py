@@ -5,6 +5,8 @@ import pandas as pd
 from scipy import stats
 from tqdm import tqdm
 
+cv = lambda x: np.nanstd(x) / np.nanmean(x)
+
 
 def mean_var_co_per_genome(df):
     """Compute the average number of crossovers per-chromosome for an individual."""
@@ -26,15 +28,16 @@ def mean_var_co_per_genome(df):
         values = co_df[(co_df.mother == m) & (co_df.crossover_sex == "maternal")][
             "n_crossover"
         ].values
-        data.append([m, m, np.mean(values), np.var(values)])
+        data.append([m, m, np.nanmean(values), np.nanvar(values), cv(values)])
     for p in tqdm(np.unique(df.father)):
         values = co_df[(co_df.father == p) & (co_df.crossover_sex == "paternal")][
             "n_crossover"
         ].values
-        data.append([p, p, np.mean(values), np.var(values)])
+        data.append([p, p, np.nanmean(values), np.nanvar(values), cv(values)])
     out_df = pd.DataFrame(data)
-    out_df.columns = ["FID", "IID", "MeanCO", "VarCO"]
+    out_df.columns = ["FID", "IID", "MeanCO", "VarCO", "cvCO"]
     return out_df
+
 
 def random_pheno(df, seed=42):
     """Create a random phenotype as a test for main analysis."""
@@ -54,13 +57,6 @@ def random_pheno(df, seed=42):
     out_df = pd.DataFrame(data)
     out_df.columns = ["FID", "IID", "RandPheno"]
     return out_df
-
-
-
-
-
-
-
 
 
 if __name__ == "__main__":

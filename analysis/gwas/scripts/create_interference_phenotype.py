@@ -2,7 +2,8 @@
 
 import numpy as np
 import pandas as pd
-from scipy.optimize 
+
+from scipy.optimize
 import rpy2
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
@@ -18,11 +19,11 @@ def est_eta_nu_params(xolocs, chrom_lens):
 			loglik += xoi.stahlLoglik(xolocs[c], chrlen=chrom_lens[c], nu=nu, p=p)[0]
 		return -loglik
 	# Actually performing the inference here to estimate the parameters
-	opt_res = minimize(loglikStahl, 
-		x0=[4, 0.1], 
-		method="L-BFGS-B", 
-		bounds=[(1, 10), (0.01, 0.99)], 
-		tol=1e-3, 
+	opt_res = minimize(loglikStahl,
+		x0=[4, 0.1],
+		method="L-BFGS-B",
+		bounds=[(1, 10), (0.01, 0.99)],
+		tol=1e-3,
 		options={"disp": False},
   )
 	nu_est = opt_res.x[0]

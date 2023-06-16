@@ -20,7 +20,7 @@ rule all:
             "results/xo_interference/{name}.age_xo_interference.{recmap}.{chrom}.tsv",
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
-            chrom=["chr4", "chr10", "chr22"]
+            chrom=["chr4", "chr10", "chr22"],
         ),
         expand(
             "results/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-rates.txt",
