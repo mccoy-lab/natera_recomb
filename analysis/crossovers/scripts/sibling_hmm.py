@@ -112,7 +112,7 @@ if __name__ == "__main__":
                 data_dict=family_data,
             )
             pi0_01, sigma_01 = hmm.est_sigma_pi0(
-                bafs=[baf0, baf1], mat_haps=mat_haps, pat_haps=pat_haps, r=1e-18
+                bafs=[baf0[::5], baf1[::5]], mat_haps=mat_haps[:,::5], pat_haps=pat_haps[:,::5], r=1e-18
             )
             path_01, _, _, _ = hmm.viterbi_algorithm(
                 bafs=[baf0, baf1],
@@ -124,7 +124,7 @@ if __name__ == "__main__":
             )
             refined_path_01 = hmm.restrict_path(path_01)
             pi0_02, sigma_02 = hmm.est_sigma_pi0(
-                bafs=[baf0, baf2], mat_haps=mat_haps, pat_haps=pat_haps, r=1e-18
+                bafs=[baf0[::5], baf2[::5]], mat_haps=mat_haps[:,::5], pat_haps=pat_haps[:,::5], r=1e-18
             )
             path_02, _, _, _ = hmm.viterbi_algorithm(
                 bafs=[baf0, baf2],
