@@ -31,7 +31,7 @@ if __name__ == "__main__":
     # Read in the input data and params ...
     baf_data = np.load(snakemake.input["baf"])
     eps = 10 ** snakemake.params["eps"]
-    r = 1e-15
+    r = 1e-8
     if "r" in snakemake.params:
         r = 10 ** snakemake.params["r"]
     if "pos" in baf_data:
@@ -54,20 +54,27 @@ if __name__ == "__main__":
     for i in range(nsibs):
         j = (i + 1) % nsibs
         j2 = (i + 2) % nsibs
+        pi0_01, sigma_01 = hmm.est_sigma_pi0(
+                bafs=[baf_data[f"baf_embryo{i}"][::5], baf_data[f"baf_embryo{j}"][::5]], mat_haps=mat_haps[:,::5], pat_haps=pat_haps[:,::5], r=r
+        )
         path01, _, _, _ = hmm.viterbi_algorithm(
             bafs=[baf_data[f"baf_embryo{i}"], baf_data[f"baf_embryo{j}"]],
             mat_haps=mat_haps,
             pat_haps=pat_haps,
-            std_dev=0.15,
+            std_dev=sigma_01,
+            pi0=pi0_01,
             r=r,
         )
         refined_path01 = hmm.restrict_path(path01)
-
+        pi0_02, sigma_02 = hmm.est_sigma_pi0(
+                bafs=[baf_data[f"baf_embryo{i}"][::5], baf_data[f"baf_embryo{j2}"][::5]], mat_haps=mat_haps[:,::5], pat_haps=pat_haps[:,::5], r=r
+        )
         path02, _, _, _ = hmm.viterbi_algorithm(
             bafs=[baf_data[f"baf_embryo{i}"], baf_data[f"baf_embryo{j2}"]],
             mat_haps=mat_haps,
             pat_haps=pat_haps,
-            std_dev=0.15,
+            std_dev=sigma_02,
+            pi0=pi0_02,
             r=r,
         )
         refined_path02 = hmm.restrict_path(path02)
@@ -76,6 +83,8 @@ if __name__ == "__main__":
         res_dict[f"pat_rec{i}"] = [x[0] for x in pat_rec]
         res_dict[f"mat_rec{i}_dist"] = [x[1] for x in mat_rec]
         res_dict[f"pat_rec{i}_dist"] = [x[1] for x in pat_rec]
+        res_dict[f"pi0_{i}"] = [pi0_01, pi0_02]
+        res_dict[f"sigma_{i}"] = [sigma_01, sigma_02]
 
     if "pos" in baf_data:
         res_dict["pos"] = baf_data["pos"]

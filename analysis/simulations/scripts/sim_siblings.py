@@ -50,31 +50,34 @@ def create_switch_errors(mat_haps, pat_haps, err_rate=1e-3, seed=42):
     assert mat_haps.size == pat_haps.size
     assert mat_haps.ndim == 2
     assert mat_haps.ndim == 2
-    assert (err_rate > 0) and (err_rate < 1)
+    assert (err_rate >= 0) and (err_rate < 1)
     assert seed > 0
     # Create the shuffled maternal haplotypes
-    m = mat_haps.shape[1]
-    mat_haps_prime = np.zeros(shape=mat_haps.shape, dtype=int)
-    pat_haps_prime = np.zeros(shape=mat_haps.shape, dtype=int)
-    mi0, mi1 = 0, 1
-    pi0, pi1 = 0, 1
-    us1 = np.random.uniform(size=m)
-    us2 = np.random.uniform(size=m)
-    m_switch = np.where(us1 < err_rate)[0]
-    p_switch = np.where(us2 < err_rate)[0]
-    for i in range(m):
-        if us1[i] < err_rate:
-            mi0 = 1 - mi0
-            mi1 = 1 - mi1
-        mat_haps_prime[0, i] = mat_haps[mi0, i]
-        mat_haps_prime[1, i] = mat_haps[mi1, i]
-        if us2[i] < err_rate:
-            pi0 = 1 - pi0
-            pi1 = 1 - pi1
-        pat_haps_prime[0, i] = pat_haps[pi0, i]
-        pat_haps_prime[1, i] = pat_haps[pi1, i]
-    # Create the shuffled paternal haplotypes
-    return mat_haps_prime, pat_haps_prime, m_switch, p_switch
+    if err_rate == 0:
+        return mat_haps, pat_haps, np.empty(0), np.empty(0)
+    else:
+        m = mat_haps.shape[1]
+        mat_haps_prime = np.zeros(shape=mat_haps.shape, dtype=int)
+        pat_haps_prime = np.zeros(shape=mat_haps.shape, dtype=int)
+        mi0, mi1 = 0, 1
+        pi0, pi1 = 0, 1
+        us1 = np.random.uniform(size=m)
+        us2 = np.random.uniform(size=m)
+        m_switch = np.where(us1 < err_rate)[0]
+        p_switch = np.where(us2 < err_rate)[0]
+        for i in range(m):
+            if us1[i] < err_rate:
+                mi0 = 1 - mi0
+                mi1 = 1 - mi1
+            mat_haps_prime[0, i] = mat_haps[mi0, i]
+            mat_haps_prime[1, i] = mat_haps[mi1, i]
+            if us2[i] < err_rate:
+                pi0 = 1 - pi0
+                pi1 = 1 - pi1
+            pat_haps_prime[0, i] = pat_haps[pi0, i]
+            pat_haps_prime[1, i] = pat_haps[pi1, i]
+        # Create the shuffled paternal haplotypes
+        return mat_haps_prime, pat_haps_prime, m_switch, p_switch
 
 
 def sim_haplotype_paths(mat_haps, pat_haps, ploidy=2, rec_prob=1e-2, seed=42):
