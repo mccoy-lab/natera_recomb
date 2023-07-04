@@ -405,6 +405,7 @@ def main(
         "refs": refs,
         "alts": alts,
         "aploid": "real_data",
+        "child_df": child_df
     }
     return res_dict
 
