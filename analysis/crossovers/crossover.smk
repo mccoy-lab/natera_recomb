@@ -125,6 +125,7 @@ rule obtain_valid_trios:
             raw_data_path="/data/rmccoy22/natera_spectrum/data/",
         )
         with open(output.valid_trios, "w") as out:
+            out.write("mother\tfather\tchild\n") 
             for m, f, c in valid_trios:
                 out.write(f"{m}\t{f}\t{c}\n")
 
@@ -136,7 +137,7 @@ rule filter_triplet_pairs:
     output:
         valid_triplets="results/natera_inference/valid_trios.triplets.txt",
     shell:
-        "awk 'FNR==NR {{a[$1,$2] += 1;next}} a[$1, $2] >= 3 {{print $0}}' {input.valid_trios} {input.valid_trios} > {output.valid_triplets}"
+        "awk 'FNR==NR {{a[$1,$2] += 1;next}} a[$1, $2] >= 3 {{print $0}}' {input.valid_trios} {input.valid_trios}i | awk 'BEGIN{{print \"mother\tfather\tchild\"}}1' > {output.valid_triplets}"
 
 
 rule filter_putative_euploid_triplets:
@@ -152,7 +153,7 @@ rule filter_putative_euploid_triplets:
 def define_triplets(
     mother_id,
     father_id,
-    trio_file="results/natera_inference/valid_trios.triplets.euploid.txt",
+    trio_file="results/natera_inference/valid_trios.triplets.txt",
     base_path="/home/abiddan1/scratch16/natera_aneuploidy/analysis/aneuploidy/results/natera_inference",
 ):
     trio_df = pd.read_csv(trio_file, sep="\t")
@@ -163,13 +164,14 @@ def define_triplets(
     return res
 
 
-rule estimate_recombination_euploid_trio:
-    """Estimate crossover events in euploid trio datasets."""
+rule est_crossover_euploid_chrom_trio:
+    """Estimate crossover events for euploid chromosomes in trio datasets."""
     input:
-        euploid_triplets="results/natera_inference/valid_trios.triplets.euploid.txt",
+        triplets="results/natera_inference/valid_trios.triplets.txt",
         baf_pkl=lambda wildcards: define_triplets(
             mother_id=wildcards.mother, father_id=wildcards.father
         ),
+        aneuploidy_calls = aneuploidy_calls
     output:
         est_recomb="results/natera_inference/{mother}+{father}.est_recomb.tsv",
         recomb_paths="results/natera_inference/{mother}+{father}.recomb_paths.pkl.gz",
