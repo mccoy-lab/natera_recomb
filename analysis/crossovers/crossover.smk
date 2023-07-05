@@ -137,7 +137,7 @@ rule filter_triplet_pairs:
     output:
         valid_triplets="results/natera_inference/valid_trios.triplets.txt",
     shell:
-        "awk 'FNR==NR {{a[$1,$2] += 1;next}} a[$1, $2] >= 3 {{print $0}}' {input.valid_trios} {input.valid_trios}i | awk 'BEGIN{{print \"mother\tfather\tchild\"}}1' > {output.valid_triplets}"
+        "awk 'FNR==NR {{a[$1,$2] += 1;next}} a[$1, $2] >= 3 {{print $0}}' {input.valid_trios} {input.valid_trios} | awk 'BEGIN{{print \"mother\tfather\tchild\"}}1' > {output.valid_triplets}"
 
 
 rule filter_putative_euploid_triplets:

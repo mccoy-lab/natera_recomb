@@ -29,7 +29,7 @@ def euploid_per_chrom(aneuploidy_df, names, chrom='chr1'):
     if filt_names.size < 3:
         return []
     else:
-        return filt_names.to_list()
+        return filt_names.tolist()
 
 def prepare_paired_data(
     embryo_id1="10013440016_R06C01",
@@ -105,7 +105,7 @@ def find_nearest_het(idx, pos, haps):
 
 if __name__ == "__main__":
     # Read in the input data and params ...
-    aneuploidy_df = pd.read_csv(snakemake.input["aneuploidy_calls"])
+    aneuploidy_df = pd.read_csv(snakemake.input["aneuploidy_calls"], sep="\t")
     hmm = QuadHMM()
     family_data = load_baf_data(snakemake.input["baf_pkl"])
     names = [k for k in family_data.keys()]
