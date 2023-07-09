@@ -153,7 +153,7 @@ if __name__ == "__main__":
                 mat_rec, pat_rec = hmm.isolate_recomb(
                     refined_path_01, refined_path_02, window=20
                 )
-                recomb_dict[c][f"{names[i]}+{names[j]}+{names[j2]}"] = {
+                recomb_dict[c][f"{cur_names[i]}+{cur_names[j]}+{cur_names[j2]}"] = {
                     "pos": pos,
                     "path_01": refined_path_01,
                     "path_02": refined_path_02,
@@ -166,13 +166,13 @@ if __name__ == "__main__":
                     _, left_pos, _, right_pos = find_nearest_het(m[0], pos, mat_haps)
                     rec_pos = pos[m[0]]
                     lines.append(
-                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tmaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
+                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{cur_names[i]}\t{c}\tmaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
                     )
                 for p in pat_rec:
                     _, left_pos, _, right_pos = find_nearest_het(p[0], pos, pat_haps)
                     rec_pos = pos[p[0]]
                     lines.append(
-                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{names[i]}\t{c}\tpaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
+                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{cur_names[i]}\t{c}\tpaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
                     )
         else:
             pass
