@@ -30,8 +30,7 @@ if __name__ == "__main__":
     hmm = QuadHMM()
     # Read in the input data and params ...
     baf_data = np.load(snakemake.input["baf"])
-    eps = 10 ** snakemake.params["eps"]
-    r = 1e-8
+    r = 1e-16
     if "r" in snakemake.params:
         r = 10 ** snakemake.params["r"]
     if "pos" in baf_data:
