@@ -61,8 +61,7 @@ rule estimate_co_hmm:
     output:
         hmm_out="results/sims/inferhmm_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
     params:
-        eps=-6,
-        r = -8
+        r = -15
     script:
         "scripts/sibhmm_inference.py"
 

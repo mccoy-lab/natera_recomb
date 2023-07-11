@@ -6,11 +6,6 @@ from scipy.stats import beta, binom, norm, rv_histogram, truncnorm, uniform
 # These are the different classes of aneuploidy that we can putatively simulate from
 sim_ploidy_values = ["0", "1m", "1p", "2", "3m", "3p"]
 
-# Setup dictionaries for LRR estimation
-lrr_mu = {0: -3.527211, 1: np.log2(0.5), 2: np.log2(1.0), 3: np.log2(1.5)}
-lrr_sd = {0: 1.329152, 1: 0.284338, 2: 0.159645, 3: 0.209089}
-
-
 def draw_parental_genotypes(afs=None, m=100, seed=42):
     """Draw parental genotypes from a beta distribution.
 
@@ -136,21 +131,6 @@ def sim_b_allele_freq(mat_hap, pat_hap, ploidy=2, std_dev=0.2, mix_prop=0.3, see
                 baf[i] = truncnorm.rvs(a, b, loc=mu_i, scale=std_dev)
     return true_geno, baf
 
-
-def sim_logR_ratio(mat_hap, pat_hap, ploidy=2, alpha=1.0, seed=42):
-    """Simulate logR-ratio conditional on ploidy.
-
-    Alpha is the degree to which the variance is increased for the LRR.
-    """
-    assert seed > 0
-    assert ploidy in [0, 1, 2, 3]
-    assert mat_hap.size == pat_hap.size
-    np.random.seed(seed)
-    m = mat_hap.size
-    lrr = norm.rvs(lrr_mu[ploidy], scale=lrr_sd[ploidy] * alpha, size=m)
-    return lrr
-
-
 def sibling_euploid_sim(
     afs=None,
     ploidy=2,
@@ -200,14 +180,10 @@ def sibling_euploid_sim(
             mix_prop=mix_prop,
             seed=seed + i,
         )
-        lrr = sim_logR_ratio(
-            mat_hap1, pat_hap1, ploidy=ploidy, alpha=alpha, seed=seed + i
-        )
 
         assert geno.size == m
         assert baf.size == m
         res_table[f"baf_embryo{i}"] = baf
-        res_table[f"lrr_embryo{i}"] = lrr
         res_table[f"zs_maternal{i}"] = zs_maternal
         res_table[f"zs_paternal{i}"] = zs_paternal
     return res_table
