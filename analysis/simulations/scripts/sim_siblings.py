@@ -40,40 +40,28 @@ def draw_parental_genotypes(afs=None, m=100, seed=42):
     return [np.vstack([mat_h1, mat_h2]), np.vstack([pat_h1, pat_h2])]
 
 
-def create_switch_errors(mat_haps, pat_haps, err_rate=1e-3, seed=42):
-    """Create switch errors to evaluate impact of poor phasing."""
-    assert mat_haps.size == pat_haps.size
-    assert mat_haps.ndim == 2
-    assert mat_haps.ndim == 2
-    assert (err_rate >= 0) and (err_rate < 1)
-    assert seed > 0
-    # Create the shuffled maternal haplotypes
-    if err_rate == 0:
-        return mat_haps, pat_haps, np.empty(0), np.empty(0)
-    else:
-        m = mat_haps.shape[1]
-        mat_haps_prime = np.zeros(shape=mat_haps.shape, dtype=int)
-        pat_haps_prime = np.zeros(shape=mat_haps.shape, dtype=int)
-        mi0, mi1 = 0, 1
-        pi0, pi1 = 0, 1
-        us1 = np.random.uniform(size=m)
-        us2 = np.random.uniform(size=m)
-        m_switch = np.where(us1 < err_rate)[0]
-        p_switch = np.where(us2 < err_rate)[0]
-        for i in range(m):
-            if us1[i] < err_rate:
-                mi0 = 1 - mi0
-                mi1 = 1 - mi1
-            mat_haps_prime[0, i] = mat_haps[mi0, i]
-            mat_haps_prime[1, i] = mat_haps[mi1, i]
-            if us2[i] < err_rate:
-                pi0 = 1 - pi0
-                pi1 = 1 - pi1
-            pat_haps_prime[0, i] = pat_haps[pi0, i]
-            pat_haps_prime[1, i] = pat_haps[pi1, i]
-        # Create the shuffled paternal haplotypes
-        return mat_haps_prime, pat_haps_prime, m_switch, p_switch
-
+def create_switch_errors(haps, err_rate=1e-3, seed=42):
+    """Revised method to create switch errors."""
+    np.random.seed(seed)
+    m = haps.shape[1]
+    geno = haps.sum(axis=0)
+    n_hets = np.sum(geno == 1)
+    us = np.random.uniform(size=n_hets)
+    haps_prime = np.zeros(shape=haps.shape, dtype=int)
+    switches = []
+    i0, i1 = 0,1
+    j = 0
+    for i in range(m):
+        # We only create switches between heterozygotes ... 
+        if geno[i] == 1:
+            if us[j] < err_rate:
+                i0 = 1 - i0
+                i1 = 1 - i1
+                switches.append(i)
+            j += 1
+        haps_prime[0, i] = haps[i0, i]
+        haps_prime[1, i] = haps[i1, i]
+    return haps_prime, np.array(switches)
 
 def sim_haplotype_paths(mat_haps, pat_haps, ploidy=2, rec_prob=1e-2, seed=42):
     """Simulate paths through the maternal and paternal haplotypes."""
@@ -152,8 +140,11 @@ def sibling_euploid_sim(
 
     res_table = {}
     mat_haps, pat_haps = draw_parental_genotypes(afs=None, m=m, seed=seed)
-    mat_haps_prime, pat_haps_prime, mat_switch, pat_switch = create_switch_errors(
-        mat_haps, pat_haps, err_rate=switch_err_rate, seed=seed
+    mat_haps_prime, mat_switch = create_switch_errors(
+        haps=mat_haps, err_rate=switch_err_rate, seed=seed
+    )
+    pat_haps_prime, pat_switch = create_switch_errors(
+        haps=pat_haps, err_rate=switch_err_rate, seed=seed
     )
     res_table["mat_haps_true"] = mat_haps
     res_table["pat_haps_true"] = pat_haps
@@ -171,7 +162,6 @@ def sibling_euploid_sim(
             rec_prob=rec_prob,
             seed=seed + i,
         )
-        # print(ploidy, aploid, mat_hap1, pat_hap1)
         geno, baf = sim_b_allele_freq(
             mat_hap1,
             pat_hap1,
