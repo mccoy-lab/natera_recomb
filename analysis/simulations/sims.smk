@@ -28,7 +28,9 @@ rule sim_siblings:
         pi0=lambda wildcards: int(wildcards.pi0) / 100,
         sigma=lambda wildcards: int(wildcards.std) / 100,
         sfs=config["afs"],
-        seed=lambda wildcards: int(wildcards.rep) + int(wildcards.pi0) + int(wildcards.std),
+        seed=lambda wildcards: int(wildcards.rep)
+        + int(wildcards.pi0)
+        + int(wildcards.std),
     script:
         "scripts/sim_siblings.py"
 
@@ -61,7 +63,7 @@ rule estimate_co_hmm:
     output:
         hmm_out="results/sims/inferhmm_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
     params:
-        r = -15
+        r=-16,
     script:
         "scripts/sibhmm_inference.py"
 
@@ -92,25 +94,21 @@ rule concat_true_inferred:
         std = int(wildcards.std) / 100
         m = int(wildcards.m)
         phase_err = int(wildcards.p) / 1000
-        r_hat = filt_infer_data['r']
+        r_hat = filt_infer_data["r"]
         with open(output.co_tsv, "w+") as out:
             out.write(
                 "rep\tpi0\tsigma\tm\tphase_err\tnsibs\tsib_index\tr_hat\tpi0_sib\tsigma_sib\ttrue_co_mat\tinf_co_mat\ttrue_co_pat\tinf_co_pat\n"
             )
-            for i in range(nsibs):
-                cos_pos_mat = ",".join([str(x) for x in true_data[f"cos_pos_mat_{i}"]])
-                cos_pos_pat = ",".join([str(x) for x in true_data[f"cos_pos_pat_{i}"]])
-                mat_rec_filt = ",".join(
-                    [str(x) for x in filt_infer_data[f"mat_rec{i}"]]
-                )
-                pat_rec_filt = ",".join(
-                    [str(x) for x in filt_infer_data[f"pat_rec{i}"]]
-                )
-                pi0_sib = ",".join([str(p) for p in filt_infer_data[f"pi0_{i}"]])
-                sigma_sib = ",".join([str(p) for p in filt_infer_data[f"sigma_{i}"]])
-                out.write(
-                    f"{rep}\t{pi0}\t{std}\t{m}\t{phase_err}\t{nsibs}\t{i}\t{r_hat}\t{pi0_sib}\t{sigma_sib}\t{cos_pos_mat}\t{mat_rec_filt}\t{cos_pos_pat}\t{pat_rec_filt}\n"
-                )
+            i = 0
+            cos_pos_mat = ",".join([str(x) for x in true_data[f"cos_pos_mat_{i}"]])
+            cos_pos_pat = ",".join([str(x) for x in true_data[f"cos_pos_pat_{i}"]])
+            mat_rec_filt = ",".join([str(x) for x in filt_infer_data[f"mat_rec{i}"]])
+            pat_rec_filt = ",".join([str(x) for x in filt_infer_data[f"pat_rec{i}"]])
+            pi0_sib = np.mean(filt_infer_data[f"pi0_{i}"])
+            sigma_sib = np.mean(filt_infer_data[f"sigma_{i}"])
+            out.write(
+                f"{rep}\t{pi0}\t{std}\t{m}\t{phase_err}\t{nsibs}\t{i}\t{r_hat}\t{pi0_sib}\t{sigma_sib}\t{cos_pos_mat}\t{mat_rec_filt}\t{cos_pos_pat}\t{pat_rec_filt}\n"
+            )
 
 
 rule collect_crossover_results:

@@ -127,7 +127,6 @@ def sibling_euploid_sim(
     rec_prob=1e-4,
     std_dev=0.2,
     mix_prop=0.3,
-    alpha=1.0,
     switch_err_rate=1e-2,
     seed=42,
 ):
@@ -185,8 +184,11 @@ if __name__ == "__main__":
         afs = np.loadtxt(snakemake.params["sfs"])
     else:
         afs = None
+
+    # Set the seed as unique for this seed, phase_error, nsib combination ... 
+    seed = snakemake.params["seed"] + int(snakemake.params["phase_err"]*1e3) + int(snakemake.params["nsib"])
     # Run the full simulation using the defined helper function
-    # NOTE: that r=1e-4 indicates something like a 100 Mb simulator ...
+    # NOTE: that r=1e-4 indicates that there is a 1/10000 chance for crossover between each SNP...
     table_data = sibling_euploid_sim(
         afs=afs,
         m=snakemake.params["m"],
@@ -194,8 +196,7 @@ if __name__ == "__main__":
         rec_prob=1e-4,
         std_dev=snakemake.params["sigma"],
         mix_prop=snakemake.params["pi0"],
-        alpha=1.0,
         switch_err_rate=snakemake.params["phase_err"],
-        seed=snakemake.params["seed"],
+        seed=seed,
     )
     np.savez_compressed(snakemake.output["sim"], **table_data)
