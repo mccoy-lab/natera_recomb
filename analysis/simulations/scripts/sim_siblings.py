@@ -153,6 +153,7 @@ def sibling_euploid_sim(
     res_table["pat_switch"] = pat_switch
     res_table["nsibs"] = nsibs
     res_table["aploid"] = "2"
+    res_table["seed"] = seed
     for i in range(nsibs):
         zs_maternal, zs_paternal, mat_hap1, pat_hap1, aploid = sim_haplotype_paths(
             mat_haps,
@@ -186,14 +187,15 @@ if __name__ == "__main__":
         afs = None
 
     # Set the seed as unique for this seed, phase_error, nsib combination ... 
-    seed = snakemake.params["seed"] + int(snakemake.params["phase_err"]*1e3) + int(snakemake.params["nsib"])
+    seed = snakemake.params["seed"] + int(snakemake.params["phase_err"]*1e3) + int(snakemake.params["nsib"]*100)
     # Run the full simulation using the defined helper function
-    # NOTE: that r=1e-4 indicates that there is a 1/10000 chance for crossover between each SNP...
+    # NOTE: This now should have an expected number of one crossover per chromosome per parent 
+    r = 1. / snakemake.params["m"]
     table_data = sibling_euploid_sim(
         afs=afs,
         m=snakemake.params["m"],
         nsibs=snakemake.params["nsib"],
-        rec_prob=1e-4,
+        rec_prob=r,
         std_dev=snakemake.params["sigma"],
         mix_prop=snakemake.params["pi0"],
         switch_err_rate=snakemake.params["phase_err"],

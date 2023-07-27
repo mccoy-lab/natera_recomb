@@ -30,7 +30,7 @@ if __name__ == "__main__":
     hmm = QuadHMM()
     # Read in the input data and params ...
     baf_data = np.load(snakemake.input["baf"])
-    r = 1e-16
+    r = 1e-8
     if "r" in snakemake.params:
         r = 10 ** snakemake.params["r"]
     if "pos" in baf_data:
@@ -56,10 +56,10 @@ if __name__ == "__main__":
     i = 0
     for j in range(1, nsibs):
         pi0_x, sigma_x = hmm.est_sigma_pi0(
-                bafs=[baf_data[f"baf_embryo{i}"][::5], baf_data[f"baf_embryo{j}"][::5]], 
-                mat_haps=mat_haps[:,::5], 
-                pat_haps=pat_haps[:,::5],
-                algo = "L-BFGS-B",
+                bafs=[baf_data[f"baf_embryo{i}"][::10], baf_data[f"baf_embryo{j}"][::10]], 
+                mat_haps=mat_haps[:,::10], 
+                pat_haps=pat_haps[:,::10],
+                algo = "Nelder-Mead",
                 r=r
         )
         est_pi0s.append(pi0_x)
@@ -75,9 +75,11 @@ if __name__ == "__main__":
         paths.append(path01)
 
     # Isolate the recombination events in this single embryo ... 
-    mat_rec, pat_rec = hmm.isolate_recomb(paths[0], paths[1:])
+    mat_rec, pat_rec, mat_rec_dict, pat_rec_dict = hmm.isolate_recomb(paths[0], paths[1:])
     res_dict[f"mat_rec{i}"] = mat_rec
     res_dict[f"pat_rec{i}"] = pat_rec
+    res_dict[f"mat_rec_dict{i}"] = mat_rec_dict
+    res_dict[f"pat_rec_dict{i}"] = pat_rec_dict
     res_dict[f"pi0_{i}"] = est_pi0s
     res_dict[f"sigma_{i}"] = est_sigmas
 

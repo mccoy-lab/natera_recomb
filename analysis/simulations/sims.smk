@@ -12,7 +12,9 @@ rule all:
 
 
 rule sim_siblings:
-    """Simulate sibling embryo data."""
+    """Simulate sibling embryo data.
+    NOTE: we arbitrarily multiply the variables for the seed so that they are more random.
+    """
     output:
         sim="results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
     wildcard_constraints:
@@ -29,8 +31,8 @@ rule sim_siblings:
         sigma=lambda wildcards: int(wildcards.std) / 100,
         sfs=config["afs"],
         seed=lambda wildcards: int(wildcards.rep)
-        + int(wildcards.pi0)
-        + int(wildcards.std),
+        + int(wildcards.pi0)*3
+        + int(wildcards.std)*5,
     script:
         "scripts/sim_siblings.py"
 
