@@ -6,6 +6,7 @@ from scipy.stats import beta, binom, norm, rv_histogram, truncnorm, uniform
 # These are the different classes of aneuploidy that we can putatively simulate from
 sim_ploidy_values = ["0", "1m", "1p", "2", "3m", "3p"]
 
+
 def draw_parental_genotypes(afs=None, m=100, seed=42):
     """Draw parental genotypes from a beta distribution.
 
@@ -49,10 +50,10 @@ def create_switch_errors(haps, err_rate=1e-3, seed=42):
     us = np.random.uniform(size=n_hets)
     haps_prime = np.zeros(shape=haps.shape, dtype=int)
     switches = []
-    i0, i1 = 0,1
+    i0, i1 = 0, 1
     j = 0
     for i in range(m):
-        # We only create switches between heterozygotes ... 
+        # We only create switches between heterozygotes ...
         if geno[i] == 1:
             if us[j] < err_rate:
                 i0 = 1 - i0
@@ -62,6 +63,7 @@ def create_switch_errors(haps, err_rate=1e-3, seed=42):
         haps_prime[0, i] = haps[i0, i]
         haps_prime[1, i] = haps[i1, i]
     return haps_prime, np.array(switches)
+
 
 def sim_haplotype_paths(mat_haps, pat_haps, ploidy=2, rec_prob=1e-2, seed=42):
     """Simulate paths through the maternal and paternal haplotypes."""
@@ -118,6 +120,7 @@ def sim_b_allele_freq(mat_hap, pat_hap, ploidy=2, std_dev=0.2, mix_prop=0.3, see
             else:
                 baf[i] = truncnorm.rvs(a, b, loc=mu_i, scale=std_dev)
     return true_geno, baf
+
 
 def sibling_euploid_sim(
     afs=None,
@@ -186,11 +189,15 @@ if __name__ == "__main__":
     else:
         afs = None
 
-    # Set the seed as unique for this seed, phase_error, nsib combination ... 
-    seed = snakemake.params["seed"] + int(snakemake.params["phase_err"]*1e3) + int(snakemake.params["nsib"]*100)
+    # Set the seed as unique for this seed, phase_error, nsib combination ...
+    seed = (
+        snakemake.params["seed"]
+        + int(snakemake.params["phase_err"] * 1e3)
+        + int(snakemake.params["nsib"] * 100)
+    )
     # Run the full simulation using the defined helper function
-    # NOTE: This now should have an expected number of one crossover per chromosome per parent 
-    r = 1. / snakemake.params["m"]
+    # NOTE: This now should have an expected number of one crossover per chromosome per parent
+    r = 1.0 / snakemake.params["m"]
     table_data = sibling_euploid_sim(
         afs=afs,
         m=snakemake.params["m"],
