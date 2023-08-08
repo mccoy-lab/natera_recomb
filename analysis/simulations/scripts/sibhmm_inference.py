@@ -30,7 +30,7 @@ if __name__ == "__main__":
     hmm = QuadHMM()
     # Read in the input data and params ...
     baf_data = np.load(snakemake.input["baf"])
-    r = 1e-8
+    r = 1e-4
     if "r" in snakemake.params:
         r = 10 ** snakemake.params["r"]
     if "pos" in baf_data:
@@ -43,27 +43,26 @@ if __name__ == "__main__":
     assert baf_data["nsibs"] >= 3
     nsibs = baf_data["nsibs"]
     # NOTE: use the erroneous haplotypes that may have switch errors here ...
-    mat_haps = baf_data["mat_haps_real"]
-    pat_haps = baf_data["pat_haps_real"]
+    if snakemake.params["corrected"]:
+        mat_haps = baf_data["mat_haps_fixed"]
+        pat_haps = baf_data["pat_haps_fixed"]
+    else:
+        mat_haps = baf_data["mat_haps_real"]
+        pat_haps = baf_data["pat_haps_real"]
+    est_pi0s = baf_data["est_pi0s"]
+    est_sigmas = baf_data["est_sigmas"]
     res_dict = {}
     res_dict["r"] = r
     res_dict["aploid"] = baf_data["aploid"]
     res_dict["nsibs"] = nsibs
-    # We just do this for the first embryo as a small sanity check ...  
+    # We just do this for the first embryo as a small sanity check ...
     paths = []
-    est_pi0s = []
-    est_sigmas = []
+    paths_true = []
     i = 0
     for j in range(1, nsibs):
-        pi0_x, sigma_x = hmm.est_sigma_pi0(
-                bafs=[baf_data[f"baf_embryo{i}"][::10], baf_data[f"baf_embryo{j}"][::10]], 
-                mat_haps=mat_haps[:,::10], 
-                pat_haps=pat_haps[:,::10],
-                algo = "Nelder-Mead",
-                r=r
-        )
-        est_pi0s.append(pi0_x)
-        est_sigmas.append(sigma_x)
+        # NOTE: we don't employ the parameter inference step here but assume that it has been done slightly earlier in a disomy model
+        pi0_x = np.median([est_pi0s[i], est_pi0s[j]])
+        sigma_x = np.median([est_sigmas[i], est_sigmas[j]])
         path01 = hmm.map_path(
             bafs=[baf_data[f"baf_embryo{i}"], baf_data[f"baf_embryo{j}"]],
             mat_haps=mat_haps,
@@ -73,13 +72,30 @@ if __name__ == "__main__":
             r=r,
         )
         paths.append(path01)
+        path01_true = hmm.map_path(
+            bafs=[baf_data[f"baf_embryo{i}"], baf_data[f"baf_embryo{j}"]],
+            mat_haps=baf_data["mat_haps_true"],
+            pat_haps=baf_data["pat_haps_true"],
+            std_dev=sigma_x,
+            pi0=pi0_x,
+            r=r,
+        )
+        paths_true.append(path01_true)
 
-    # Isolate the recombination events in this single embryo ... 
-    mat_rec, pat_rec, mat_rec_dict, pat_rec_dict = hmm.isolate_recomb(paths[0], paths[1:])
+    # Isolate the recombination events in this single embryo ...
+    mat_rec, pat_rec, mat_rec_dict, pat_rec_dict = hmm.isolate_recomb(
+        paths[0], paths[1:]
+    )
+    mat_rec_true, pat_rec_true, mat_rec_dict, pat_rec_dict = hmm.isolate_recomb(
+        paths_true[0], paths_true[1:]
+    )
     res_dict[f"mat_rec{i}"] = mat_rec
     res_dict[f"pat_rec{i}"] = pat_rec
+    res_dict[f"mat_rec_truehap{i}"] = mat_rec_true
+    res_dict[f"pat_rec_truehap{i}"] = pat_rec_true
     res_dict[f"mat_rec_dict{i}"] = mat_rec_dict
     res_dict[f"pat_rec_dict{i}"] = pat_rec_dict
+
     res_dict[f"pi0_{i}"] = est_pi0s
     res_dict[f"sigma_{i}"] = est_sigmas
 
