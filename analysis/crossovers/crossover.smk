@@ -164,7 +164,7 @@ def define_triplets(
     return res
 
 
-rule est_crossover_euploid_chrom_trio:
+rule est_params_euploid_chrom_trio:
     """Estimate crossover events for euploid chromosomes in trio datasets."""
     input:
         triplets="results/natera_inference/valid_trios.triplets.txt",
@@ -172,6 +172,26 @@ rule est_crossover_euploid_chrom_trio:
             mother_id=wildcards.mother, father_id=wildcards.father
         ),
         aneuploidy_calls = aneuploidy_calls
+    output:
+        est_params="results/natera_inference/{mother}+{father}.est_params.tsv",
+    params:
+        chroms=chroms,
+    resources:
+        time="3:00:00",
+        mem_mb="5G",
+    script:
+        "scripts/est_params_sibling_euploid.py"
+
+
+rule est_crossover_euploid_chrom_trio:
+    """Estimate crossover events for euploid chromosomes in trio datasets."""
+    input:
+        triplets="results/natera_inference/valid_trios.triplets.txt",
+        baf_pkl=lambda wildcards: define_triplets(
+            mother_id=wildcards.mother, father_id=wildcards.father
+        ),
+        aneuploidy_calls = aneuploidy_calls,
+        est_params="results/natera_inference/{mother}+{father}.est_params.tsv",
     output:
         est_recomb="results/natera_inference/{mother}+{father}.est_recomb.tsv",
         recomb_paths="results/natera_inference/{mother}+{father}.recomb_paths.pkl.gz",

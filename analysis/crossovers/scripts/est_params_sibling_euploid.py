@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 import pandas as pd
 import numpy as np
-from karyohmm import QuadHMM, MetaHMM
+from karyohmm import MetaHMM
 from tqdm import tqdm
 
 
@@ -106,7 +106,6 @@ def find_nearest_het(idx, pos, haps):
 if __name__ == "__main__":
     # Read in the input data and params ...
     aneuploidy_df = pd.read_csv(snakemake.input["aneuploidy_calls"], sep="\t")
-    hmm = QuadHMM()
     hmm_dis = MetaHMM(disomy=True)
     family_data = load_baf_data(snakemake.input["baf_pkl"])
     names = [k for k in family_data.keys()]
@@ -127,7 +126,7 @@ if __name__ == "__main__":
                     chrom=c,
                     data_dict=family_data,
                 )
-                pi0_0, sigma_1 = hmm_dis.est_sigma_pi0(
+                pi0_0, sigma_0 = hmm_dis.est_sigma_pi0(
                     bafs=baf0[::2],
                     mat_haps=mat_haps[:, ::2],
                     pat_haps=pat_haps[:, ::2],
@@ -148,56 +147,19 @@ if __name__ == "__main__":
                     algo="Powell",
                     r=1e-4,
                 )
-                path_01, _, _, _ = hmm.viterbi_algorithm(
-                    bafs=[baf0, baf1],
-                    mat_haps=mat_haps,
-                    pat_haps=pat_haps,
-                    pi0=pi0_0,
-                    std_dev=sigma_0,
-                    r=1e-18,
-                )
-                refined_path_01 = hmm.restrict_path(path_01)
-                path_02, _, _, _ = hmm.viterbi_algorithm(
-                    bafs=[baf0, baf2],
-                    mat_haps=mat_haps,
-                    pat_haps=pat_haps,
-                    pi0=pi0_0,
-                    std_dev=sigma_0,
-                    r=1e-18,
-                )
-                refined_path_02 = hmm.restrict_path(path_02)
-                mat_rec, pat_rec = hmm.isolate_recomb(
-                    refined_path_01, refined_path_02, window=20
-                )
-                recomb_dict[c][f"{cur_names[i]}+{cur_names[j]}+{cur_names[j2]}"] = {
-                    "pos": pos,
-                    "path_01": refined_path_01,
-                    "path_02": refined_path_02,
-                    "pi0_01": pi0_01,
-                    "pi0_02": pi0_02,
-                    "sigma_01": sigma_01,
-                    "sigma_02": sigma_02,
-                }
-                for m in mat_rec:
-                    _, left_pos, _, right_pos = find_nearest_het(m[0], pos, mat_haps)
-                    rec_pos = pos[m[0]]
-                    lines.append(
-                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{cur_names[i]}\t{c}\tmaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
-                    )
-                for p in pat_rec:
-                    _, left_pos, _, right_pos = find_nearest_het(p[0], pos, pat_haps)
-                    rec_pos = pos[p[0]]
-                    lines.append(
-                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{cur_names[i]}\t{c}\tpaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
-                    )
+                # Write out the lines appropriately 
+                lines.append(
+                    f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{cur_names[i]}\t{c}\t{pi0_0}\t{sigma_0}\n')
+                lines.append(
+                    f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{cur_names[j]}\t{c}\t{pi0_1}\t{sigma_1}\n')
+                lines.append(
+                    f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{cur_names[j2]}\t{c}\t{pi0_2}\t{sigma_2}\n')
         else:
             pass
-    # Write out the path dictionary with the viterbi traces
-    pickle.dump(recomb_dict, gz.open(snakemake.output["recomb_paths"], "wb"))
     # Write out the formal crossover spot output here
-    with open(snakemake.output["est_recomb"], "w") as out:
+    with open(snakemake.output["est_params"], "w") as out:
         out.write(
-            "mother\tfather\tchild\tchrom\tcrossover_sex\tmin_pos\tavg_pos\tmax_pos\tavg_pi0\tavg_sigma\n"
+            "mother\tfather\tchild\tchrom\tpi0_hat\tsigma_hat\n"
         )
         for line in lines:
             out.write(line)
