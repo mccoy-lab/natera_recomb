@@ -74,12 +74,18 @@ def create_trios(
     return valid_filt_trios
 
 
+# Determine if we
+est_params = False
+total_params = []
 total_data = []
 if Path("results/natera_inference/valid_trios.triplets.euploid.txt").is_file():
     with open("results/natera_inference/valid_trios.triplets.euploid.txt", "r") as fp:
         for i, line in enumerate(fp):
             [m, f, _] = line.rstrip().split()
             total_data.append(f"results/natera_inference/{m}+{f}.est_recomb.tsv")
+            if est_params:
+                total_params.append(f"results/natera_inference/{m}+{f}.est_params.tsv")
+        total_params = np.unique(total_params).tolist()
         total_data = np.unique(total_data).tolist()
 
 
@@ -93,6 +99,7 @@ rule all:
         "results/natera_inference/valid_trios.triplets.txt",
         "results/natera_inference/valid_trios.triplets.euploid.txt",
         total_data,
+        total_params,
 
 
 rule generate_parent_sample_list:
@@ -191,14 +198,13 @@ rule est_crossover_euploid_chrom_trio:
             mother_id=wildcards.mother, father_id=wildcards.father
         ),
         aneuploidy_calls=aneuploidy_calls,
-        est_params="results/natera_inference/{mother}+{father}.est_params.tsv",
     output:
         est_recomb="results/natera_inference/{mother}+{father}.est_recomb.tsv",
         recomb_paths="results/natera_inference/{mother}+{father}.recomb_paths.pkl.gz",
     params:
         chroms=chroms,
     resources:
-        time="5:00:00",
+        time="3:00:00",
         mem_mb="5G",
     script:
         "scripts/sibling_hmm.py"
