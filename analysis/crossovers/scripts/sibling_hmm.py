@@ -2,9 +2,10 @@ import gzip as gz
 import pickle
 import sys
 from pathlib import Path
-import pandas as pd
+
 import numpy as np
-from karyohmm import QuadHMM, MetaHMM
+import pandas as pd
+from karyohmm import MetaHMM, PhaseCorrect, QuadHMM
 from tqdm import tqdm
 
 
@@ -18,59 +19,45 @@ def load_baf_data(baf_pkls):
             family_data[embryo_name] = data
     return family_data
 
-def euploid_per_chrom(aneuploidy_df, names, chrom='chr1'):
+
+def euploid_per_chrom(aneuploidy_df, names, chrom="chr1"):
     """Return only the euploid embryo names for this chromosome."""
     assert "bf_max_cat" in aneuploidy_df.columns
     assert "mother" in aneuploidy_df.columns
     assert "father" in aneuploidy_df.columns
-    assert "child" in aneuploidy_df.columns 
+    assert "child" in aneuploidy_df.columns
     assert len(names) > 1
-    filt_names = aneuploidy_df[(aneuploidy_df.child.isin(names)) & (aneuploidy_df.chrom == chrom) & (aneuploidy_df.bf_max_cat == "2")].child.values
+    filt_names = aneuploidy_df[
+        (aneuploidy_df.child.isin(names))
+        & (aneuploidy_df.chrom == chrom)
+        & (aneuploidy_df.bf_max_cat == "2")
+    ].child.values
     if filt_names.size < 3:
         return []
     else:
         return filt_names.tolist()
 
-def prepare_paired_data(
-    embryo_id1="10013440016_R06C01",
-    embryo_id2="10013440016_R04C01",
-    embryo_id3="10013440016_R05C01",
-    chrom="chr21",
-    data_dict=None,
-):
-    """Create the filtered dataset for evaluating crossovers using the QuadHMM results."""
-    data_embryo1 = data_dict[embryo_id1][chrom]
-    data_embryo2 = data_dict[embryo_id2][chrom]
-    data_embryo3 = data_dict[embryo_id3][chrom]
-    if (data_embryo1["pos"].size != data_embryo2["pos"].size) or (
-        (data_embryo2["pos"].size != data_embryo3["pos"].size)
-    ):
-        pos1 = data_embryo1["pos"]
-        pos2 = data_embryo2["pos"]
-        pos3 = data_embryo3["pos"]
-        idx2 = np.isin(pos2, pos1) & np.isin(pos2, pos3)
-        idx1 = np.isin(pos1, pos2) & np.isin(pos1, pos3)
-        idx3 = np.isin(pos3, pos1) & np.isin(pos3, pos2)
-        baf1 = data_embryo1["baf_embryo"][idx1]
-        baf2 = data_embryo2["baf_embryo"][idx2]
-        baf3 = data_embryo3["baf_embryo"][idx3]
-        mat_haps = data_embryo1["mat_haps"][:, idx1]
-        pat_haps = data_embryo1["pat_haps"][:, idx1]
-        assert baf1.size == baf2.size
-        assert baf2.size == baf3.size
-        # Return the maternal haplotypes, paternal haplotypes, baf
-        return mat_haps, pat_haps, baf1, baf2, baf3, pos1[idx1]
-    else:
-        pos = data_embryo1["pos"]
-        baf1 = data_embryo1["baf_embryo"]
-        baf2 = data_embryo2["baf_embryo"]
-        baf3 = data_embryo3["baf_embryo"]
-        mat_haps = data_embryo1["mat_haps"]
-        pat_haps = data_embryo1["pat_haps"]
-        # Return the maternal haplotypes, paternal haplotypes, baf
-        assert baf1.size == baf2.size
-        assert baf2.size == baf3.size
-        return mat_haps, pat_haps, baf1, baf2, baf3, pos
+
+def prep_data(family_dict, names, chrom="chr21"):
+    """Prepare the data for the chromosome to have the same length in BAF across all samples."""
+    shared_pos = []
+    for k in family_dict.keys():
+        if k in names:
+            shared_pos.append(family_dict[k][chrom]["pos"])
+    collective_pos = list(set(shared_pos[0]).intersection(*shared_pos))
+    bafs = []
+    real_names = []
+    for k in family_dict.keys():
+        if k in names:
+            cur_pos = family_dict[k][chrom]["pos"]
+            baf = family_dict[k][chrom]["baf_embryo"]
+            idx = np.isin(cur_pos, collective_pos)
+            bafs.append(baf[idx])
+            mat_haps = family_dict[k][chrom]["mat_haps"][:, idx]
+            pat_haps = family_dict[k][chrom]["pat_haps"][:, idx]
+            real_names.append(k)
+    pos = np.sort(collective_pos)
+    return mat_haps, pat_haps, bafs, real_names, pos
 
 
 def find_nearest_het(idx, pos, haps):
@@ -114,81 +101,69 @@ if __name__ == "__main__":
     lines = []
     for c in tqdm(snakemake.params["chroms"]):
         cur_names = euploid_per_chrom(aneuploidy_df, names, chrom=c)
-        nsibs  = len(cur_names)
+        mat_haps, pat_haps, bafs, real_names, pos = prep_data(
+            family_dict=family_data, chrom=c, names=cur_names
+        )
+        nsibs = len(real_names)
         if nsibs >= 3:
+            pi0_ests = np.zeros(nsibs)
+            sigma_ests = np.zeros(nsibs)
+            for i in range(nsibs):
+                pi0_est, sigma_est = hmm_dis.est_sigma_pi0(
+                    bafs=bafs[i][::5],
+                    mat_haps=mat_haps[:, ::5],
+                    pat_haps=pat_haps[:, ::5],
+                    algo="Powell",
+                    r=1e-4,
+                )
+                pi0_ests[i] = pi0_est
+                sigma_ests[i] = sigma_est
+            # Apply the phase correction method here ...
+            phase_correct = PhaseCorrect(mat_haps=mat_haps, pat_haps=pat_haps)
+            phase_correct.add_baf(bafs)
+            phase_correct.phase_correct(
+                pi0=np.median(pi0_ests), std_dev=np.median(sigma_ests)
+            )
+            phase_correct.phase_correct(
+                maternal=False, pi0=np.median(pi0_ests), std_dev=np.median(sigma_ests)
+            )
             recomb_dict[c] = {}
             for i in range(nsibs):
-                j = (i + 1) % nsibs
-                j2 = (i + 2) % nsibs
-                mat_haps, pat_haps, baf0, baf1, baf2, pos = prepare_paired_data(
-                    embryo_id1=cur_names[i],
-                    embryo_id2=cur_names[j],
-                    embryo_id3=cur_names[j2],
-                    chrom=c,
-                    data_dict=family_data,
-                )
-                pi0_0, sigma_1 = hmm_dis.est_sigma_pi0(
-                    bafs=baf0[::2],
-                    mat_haps=mat_haps[:, ::2],
-                    pat_haps=pat_haps[:, ::2],
-                    algo="Powell",
-                    r=1e-4,
-                )
-                pi0_1, sigma_1 = hmm_dis.est_sigma_pi0(
-                    bafs=baf1[::2],
-                    mat_haps=mat_haps[:, ::2],
-                    pat_haps=pat_haps[:, ::2],
-                    algo="Powell",
-                    r=1e-4,
-                )
-                pi0_2, sigma_2 = hmm_dis.est_sigma_pi0(
-                    bafs=baf2[::2],
-                    mat_haps=mat_haps[:, ::2],
-                    pat_haps=pat_haps[:, ::2],
-                    algo="Powell",
-                    r=1e-4,
-                )
-                path_01, _, _, _ = hmm.viterbi_algorithm(
-                    bafs=[baf0, baf1],
-                    mat_haps=mat_haps,
-                    pat_haps=pat_haps,
-                    pi0=pi0_0,
-                    std_dev=sigma_0,
-                    r=1e-18,
-                )
-                refined_path_01 = hmm.restrict_path(path_01)
-                path_02, _, _, _ = hmm.viterbi_algorithm(
-                    bafs=[baf0, baf2],
-                    mat_haps=mat_haps,
-                    pat_haps=pat_haps,
-                    pi0=pi0_0,
-                    std_dev=sigma_0,
-                    r=1e-18,
-                )
-                refined_path_02 = hmm.restrict_path(path_02)
-                mat_rec, pat_rec = hmm.isolate_recomb(
-                    refined_path_01, refined_path_02, window=20
-                )
-                recomb_dict[c][f"{cur_names[i]}+{cur_names[j]}+{cur_names[j2]}"] = {
+                paths0 = []
+                for j in range(nsibs):
+                    if j != i:
+                        path_ij = hmm.map_path(
+                            bafs=[bafs[i], bafs[j]],
+                            mat_haps=phase_correct.mat_haps_fixed,
+                            pat_haps=phase_correct.pat_haps_fixed,
+                            pi0=pi0_ests[i],
+                            std_dev=sigma_ests[i],
+                            r=1e-18,
+                        )
+                        paths0.append(path_ij)
+                # Isolate the recombinations here ...
+                mat_rec, pat_rec, _, _ = hmm.isolate_recomb(paths0[0], paths0[1:])
+                recomb_dict[c][f"{real_names[i]}"] = {
                     "pos": pos,
-                    "path_01": refined_path_01,
-                    "path_02": refined_path_02,
-                    "pi0_01": pi0_01,
-                    "pi0_02": pi0_02,
-                    "sigma_01": sigma_01,
-                    "sigma_02": sigma_02,
+                    "paths": paths0,
+                    "pi0_ests": pi0_ests,
+                    "sigma_ests": sigma_ests,
                 }
                 for m in mat_rec:
-                    _, left_pos, _, right_pos = find_nearest_het(m[0], pos, mat_haps)
-                    rec_pos = pos[m[0]]
+                    _, left_pos, _, right_pos = find_nearest_het(
+                        m, pos, phase_correct.mat_haps_fixed
+                    )
+                    rec_pos = pos[m]
                     lines.append(
-                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{cur_names[i]}\t{c}\tmaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
+                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tmaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{pi0_ests[i]}\t{sigma_ests[i]}\n'
                     )
                 for p in pat_rec:
-                    _, left_pos, _, right_pos = find_nearest_het(p[0], pos, pat_haps)
-                    rec_pos = pos[p[0]]
+                    _, left_pos, _, right_pos = find_nearest_het(
+                        p, pos, phase_correct.pat_haps_fixed
+                    )
+                    rec_pos = pos[p]
                     lines.append(
-                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{cur_names[i]}\t{c}\tpaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{np.mean([pi0_01, pi0_02])}\t{np.mean([sigma_01, sigma_02])}\n'
+                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tpaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{pi0_ests[i]}\t{sigma_ests[i]}\n'
                     )
         else:
             pass

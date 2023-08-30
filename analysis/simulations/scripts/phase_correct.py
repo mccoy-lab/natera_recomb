@@ -43,13 +43,13 @@ if __name__ == "__main__":
         embryo_bafs=[baf_data[f"baf_embryo{i}"] for i in range(nsibs)]
     )
     # NOTE: Should we take the mean or average here?
-    # Phase correct the maternal haplotypes
+    # Phase correct the maternal haplotypes using the median parameter inferred across all siblings
     phase_correct.phase_correct(
         lod_thresh=snakemake.params["log_prob"],
         pi0=np.median(est_pi0s),
         std_dev=np.median(est_sigmas),
     )
-    # Phase correct the paternal haplotypes
+    # Phase correct the paternal haplotypes using median parameter inferred across all siblings
     phase_correct.phase_correct(
         maternal=False,
         lod_thresh=snakemake.params["log_prob"],

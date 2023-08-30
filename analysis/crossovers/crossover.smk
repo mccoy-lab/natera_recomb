@@ -10,7 +10,7 @@ from io import StringIO
 
 # ---- Parameters for inference in Natera Data ---- #
 metadata_file = "../../data/spectrum_metadata_merged.csv"
-aneuploidy_calls = "/data/rmccoy22/natera_spectrum/karyohmm_outputs/compiled_output/natera_embryos.karyohmm_v11.052723.tsv.gz"
+aneuploidy_calls = "/data/rmccoy22/natera_spectrum/karyohmm_outputs/compiled_output/natera_embryos_v2.karyohmm_v14.bph_sph_trisomy.071023.tsv.gz"
 
 # Create the VCF data dictionary for each chromosome ...
 vcf_dict = {}
@@ -25,7 +25,7 @@ meta_df = pd.read_csv(metadata_file)
 
 
 def find_child_data(
-    child_id, meta_dfi=meta_df, raw_data_path="/data/rmccoy22/natera_spectrum/data/"
+    child_id, meta_df=meta_df, raw_data_path="/data/rmccoy22/natera_spectrum/data/"
 ):
     """Find the child csv file based on the provided meta_df."""
     child_year = meta_df[meta_df.array == child_id].year.values
@@ -125,7 +125,7 @@ rule obtain_valid_trios:
             raw_data_path="/data/rmccoy22/natera_spectrum/data/",
         )
         with open(output.valid_trios, "w") as out:
-            out.write("mother\tfather\tchild\n") 
+            out.write("mother\tfather\tchild\n")
             for m, f, c in valid_trios:
                 out.write(f"{m}\t{f}\t{c}\n")
 
@@ -171,7 +171,7 @@ rule est_params_euploid_chrom_trio:
         baf_pkl=lambda wildcards: define_triplets(
             mother_id=wildcards.mother, father_id=wildcards.father
         ),
-        aneuploidy_calls = aneuploidy_calls
+        aneuploidy_calls=aneuploidy_calls,
     output:
         est_params="results/natera_inference/{mother}+{father}.est_params.tsv",
     params:
@@ -190,7 +190,7 @@ rule est_crossover_euploid_chrom_trio:
         baf_pkl=lambda wildcards: define_triplets(
             mother_id=wildcards.mother, father_id=wildcards.father
         ),
-        aneuploidy_calls = aneuploidy_calls,
+        aneuploidy_calls=aneuploidy_calls,
         est_params="results/natera_inference/{mother}+{father}.est_params.tsv",
     output:
         est_recomb="results/natera_inference/{mother}+{father}.est_recomb.tsv",
@@ -198,7 +198,7 @@ rule est_crossover_euploid_chrom_trio:
     params:
         chroms=chroms,
     resources:
-        time="3:00:00",
+        time="5:00:00",
         mem_mb="5G",
     script:
         "scripts/sibling_hmm.py"

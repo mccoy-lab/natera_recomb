@@ -54,7 +54,7 @@ rule correct_parental_phase:
         nsibs="\d+",
     params:
         r=-4,
-        log_prob=np.log(0.2),
+        log_prob=np.log(0.01),
     script:
         "scripts/phase_correct.py"
 
@@ -133,8 +133,12 @@ rule concat_true_inferred:
             cos_pos_pat = ",".join([str(x) for x in true_data[f"cos_pos_pat_{i}"]])
             mat_rec_filt = ",".join([str(x) for x in filt_infer_data[f"mat_rec{i}"]])
             pat_rec_filt = ",".join([str(x) for x in filt_infer_data[f"pat_rec{i}"]])
-            mat_rec_truehap = ",".join([str(x) for x in filt_infer_data[f"mat_rec_truehap{i}"]])
-            pat_rec_truehap = ",".join([str(x) for x in filt_infer_data[f"pat_rec_truehap{i}"]])
+            mat_rec_truehap = ",".join(
+                [str(x) for x in filt_infer_data[f"mat_rec_truehap{i}"]]
+            )
+            pat_rec_truehap = ",".join(
+                [str(x) for x in filt_infer_data[f"pat_rec_truehap{i}"]]
+            )
             pi0_sib = np.mean(filt_infer_data[f"pi0_{i}"])
             sigma_sib = np.mean(filt_infer_data[f"sigma_{i}"])
             out.write(
