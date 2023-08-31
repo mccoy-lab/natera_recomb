@@ -141,6 +141,9 @@ if __name__ == "__main__":
                             r=1e-18,
                         )
                         paths0.append(path_ij)
+                        # This ensures that the largest families still have reasonable runtimes
+                        if len(paths0) > 5:
+                            break
                 # Isolate the recombinations here ...
                 mat_rec, pat_rec, _, _ = hmm.isolate_recomb(paths0[0], paths0[1:])
                 recomb_dict[c][f"{real_names[i]}"] = {
