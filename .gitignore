@@ -6,5 +6,5 @@ analysis/*/log/
 *.DS_Store
 *.txt
 *nohup.*
-*sandbox/*
-
+*/sandbox/*
+sandbox*

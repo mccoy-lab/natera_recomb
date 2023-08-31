@@ -1,0 +1,20 @@
+afs: "utils/HumanCytoSNP-12v2-1_NS550_A1.hg38.annotated.autosomes.total.1kg_af.txt.gz"
+co_sims:
+  reps: 20
+  phase_err:
+    - 0
+    - 10
+    - 30
+  m:
+    - 10000
+  std_dev:
+    - 10
+    - 15
+    - 20
+    - 25
+  pi0:
+    - 60
+  nsibs:
+    - 3
+    - 5
+    - 7

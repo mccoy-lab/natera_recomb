@@ -1,0 +1,3 @@
+[submodule "analysis/co_post_process/rMCMC"]
+	path = analysis/co_post_process/rMCMC
+	url = https://github.com/aabiddanda/rMCMC
