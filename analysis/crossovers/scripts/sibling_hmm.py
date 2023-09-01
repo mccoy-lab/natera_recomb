@@ -44,19 +44,26 @@ def prep_data(family_dict, names, chrom="chr21"):
     for k in family_dict.keys():
         if k in names:
             shared_pos.append(family_dict[k][chrom]["pos"])
-    collective_pos = list(set(shared_pos[0]).intersection(*shared_pos))
     bafs = []
     real_names = []
-    for k in family_dict.keys():
-        if k in names:
-            cur_pos = family_dict[k][chrom]["pos"]
-            baf = family_dict[k][chrom]["baf_embryo"]
-            idx = np.isin(cur_pos, collective_pos)
-            bafs.append(baf[idx])
-            mat_haps = family_dict[k][chrom]["mat_haps"][:, idx]
-            pat_haps = family_dict[k][chrom]["pat_haps"][:, idx]
-            real_names.append(k)
-    pos = np.sort(collective_pos)
+    mat_haps = None
+    pat_haps = None
+    pos = None
+    try:
+        collective_pos = list(set(shared_pos[0]).intersection(*shared_pos))
+        for k in family_dict.keys():
+            if k in names:
+                cur_pos = family_dict[k][chrom]["pos"]
+                baf = family_dict[k][chrom]["baf_embryo"]
+                idx = np.isin(cur_pos, collective_pos)
+                bafs.append(baf[idx])
+                mat_haps = family_dict[k][chrom]["mat_haps"][:, idx]
+                pat_haps = family_dict[k][chrom]["pat_haps"][:, idx]
+                real_names.append(k)
+        pos = np.sort(collective_pos)
+    except IndexError:
+        # NOTE: this only happens when we have all embryos as aneuploid for the chromosome.
+        pass
     return mat_haps, pat_haps, bafs, real_names, pos
 
 
