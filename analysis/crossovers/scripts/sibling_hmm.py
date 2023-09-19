@@ -26,7 +26,6 @@ def euploid_per_chrom(aneuploidy_df, names, chrom="chr1"):
     assert "mother" in aneuploidy_df.columns
     assert "father" in aneuploidy_df.columns
     assert "child" in aneuploidy_df.columns
-    assert len(names) > 1
     filt_names = aneuploidy_df[
         (aneuploidy_df.child.isin(names))
         & (aneuploidy_df.chrom == chrom)
@@ -69,7 +68,7 @@ def prep_data(family_dict, names, chrom="chr21"):
 
 def find_nearest_het(idx, pos, haps):
     """Find the nearest heterozygotes to the estimated crossover position."""
-    assert idx > 0 and idx < haps.shape[1]
+    assert idx >= 0 and idx <= haps.shape[1]
     assert pos.size == haps.shape[1]
     geno_focal = haps[0, :] + haps[1, :]
     het_idx = np.where((geno_focal == 1))[0]
