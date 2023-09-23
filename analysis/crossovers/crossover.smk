@@ -74,12 +74,12 @@ def create_trios(
     return valid_filt_trios
 
 
-# Determine if we
+# Run inference for all valid triplets (restricting to euploid chromosomes)
 est_params = False
 total_params = []
 total_data = []
-if Path("results/natera_inference/valid_trios.triplets.euploid.txt").is_file():
-    with open("results/natera_inference/valid_trios.triplets.euploid.txt", "r") as fp:
+if Path("results/natera_inference/valid_trios.triplets.txt").is_file():
+    with open("results/natera_inference/valid_trios.triplets.txt", "r") as fp:
         for i, line in enumerate(fp):
             [m, f, _] = line.rstrip().split()
             total_data.append(f"results/natera_inference/{m}+{f}.est_recomb.tsv")
