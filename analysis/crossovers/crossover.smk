@@ -205,6 +205,6 @@ rule est_crossover_euploid_chrom_trio:
         chroms=chroms,
     resources:
         time="3:00:00",
-        mem_mb="5G",
+        mem_mb="10G",
     script:
         "scripts/sibling_hmm.py"
