@@ -10,7 +10,7 @@ from io import StringIO
 
 # ---- Parameters for inference in Natera Data ---- #
 metadata_file = "../../data/spectrum_metadata_merged.csv"
-aneuploidy_calls = "/data/rmccoy22/natera_spectrum/karyohmm_outputs/compiled_output/natera_embryos_v2.karyohmm_v14.bph_sph_trisomy.071023.tsv.gz"
+aneuploidy_calls = "/data/rmccoy22/natera_spectrum/karyohmm_outputs/compiled_output/natera_embryos.karyohmm_v18.bph_sph_trisomy.full_annotation.112023.tsv.gz"
 
 # Create the VCF data dictionary for each chromosome ...
 vcf_dict = {}
@@ -18,7 +18,7 @@ chroms = [f"chr{i}" for i in range(1, 23)]
 for i, c in enumerate(range(1, 23)):
     vcf_dict[
         chroms[i]
-    ] = f"/data/rmccoy22/natera_spectrum/genotypes/opticall_parents_031423/genotypes/eagle_phased_hg38/natera_parents.b38.chr{c}.vcf.gz"
+    ] = f"/data/rmccoy22/natera_spectrum/genotypes/opticall_parents_100423/genotypes/eagle_phased_hg38/natera_parents.b38.chr{c}.vcf.gz"
 
 # Read in the aggregate metadata file
 meta_df = pd.read_csv(metadata_file)
@@ -153,6 +153,8 @@ rule filter_putative_euploid_triplets:
         aneuploidy_calls=aneuploidy_calls,
     output:
         euploid_triplets="results/natera_inference/valid_trios.triplets.euploid.txt",
+    params:
+        ppThresh=0.95,
     script:
         "scripts/filter_euploid.py"
 
@@ -183,6 +185,7 @@ rule est_params_euploid_chrom_trio:
         est_params="results/natera_inference/{mother}+{father}.est_params.tsv",
     params:
         chroms=chroms,
+        ppThresh=0.95,
     resources:
         time="3:00:00",
         mem_mb="5G",
@@ -203,6 +206,7 @@ rule est_crossover_euploid_chrom_trio:
         recomb_paths="results/natera_inference/{mother}+{father}.recomb_paths.pkl.gz",
     params:
         chroms=chroms,
+        ppThresh=0.95,
     resources:
         time="3:00:00",
         mem_mb="10G",

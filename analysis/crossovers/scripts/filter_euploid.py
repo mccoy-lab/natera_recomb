@@ -6,11 +6,13 @@ if __name__ == "__main__":
     # Reading in the prior whole-chromosome aneuploidy calls
     aneuploidy_df = pd.read_csv(snakemake.input["aneuploidy_calls"], sep="\t")
     assert "bf_max_cat" in aneuploidy_df.columns
+    assert "2" in aneuploidy_df.columns
     assert "mother" in aneuploidy_df.columns
     assert "father" in aneuploidy_df.columns
     assert "child" in aneuploidy_df.columns
+    ppThresh = snakemake.params["ppThresh"]
     trios_data_euploid = (
-        aneuploidy_df.groupby(["mother", "father", "child"])["bf_max_cat"]
+        aneuploidy_df[aneuploidy_df["2"] >= ppThresh].groupby(["mother", "father", "child"])["bf_max_cat"]
         .agg(lambda x: np.sum(x == "2") == 22)
         .reset_index()
     )

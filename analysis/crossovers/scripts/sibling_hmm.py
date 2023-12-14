@@ -20,16 +20,18 @@ def load_baf_data(baf_pkls):
     return family_data
 
 
-def euploid_per_chrom(aneuploidy_df, names, chrom="chr1"):
+def euploid_per_chrom(aneuploidy_df, names, chrom="chr1", pp_thresh=0.95):
     """Return only the euploid embryo names for this chromosome."""
     assert "bf_max_cat" in aneuploidy_df.columns
     assert "mother" in aneuploidy_df.columns
     assert "father" in aneuploidy_df.columns
     assert "child" in aneuploidy_df.columns
+    assert "2" in aneuploidy_df.columns
+    assert len(names) > 1
     filt_names = aneuploidy_df[
         (aneuploidy_df.child.isin(names))
         & (aneuploidy_df.chrom == chrom)
-        & (aneuploidy_df.bf_max_cat == "2")
+        & (aneuploidy_df["2"] >= pp_thresh)
     ].child.values
     if filt_names.size < 3:
         return []
@@ -106,7 +108,7 @@ if __name__ == "__main__":
     recomb_dict = {}
     lines = []
     for c in tqdm(snakemake.params["chroms"]):
-        cur_names = euploid_per_chrom(aneuploidy_df, names, chrom=c)
+        cur_names = euploid_per_chrom(aneuploidy_df, names, chrom=c, pp_thresh=snakemake.params["ppThresh"])
         mat_haps, pat_haps, bafs, real_names, pos = prep_data(
             family_dict=family_data, chrom=c, names=cur_names
         )
@@ -134,21 +136,23 @@ if __name__ == "__main__":
                 maternal=False, pi0=np.median(pi0_ests), std_dev=np.median(sigma_ests)
             )
             recomb_dict[c] = {}
+            # Use the least noisy siblings to help with estimation here ... 
+            idxs = np.argsort(sigma_ests)
             for i in range(nsibs):
                 paths0 = []
-                for j in range(nsibs):
+                for j in idxs:
                     if j != i:
                         path_ij = hmm.map_path(
                             bafs=[bafs[i], bafs[j]],
                             mat_haps=phase_correct.mat_haps_fixed,
                             pat_haps=phase_correct.pat_haps_fixed,
-                            pi0=pi0_ests[i],
-                            std_dev=sigma_ests[i],
+                            pi0=(pi0_ests[i], pi0_ests[j]),
+                            std_dev=(sigma_ests[i], sigma_ests[j]),
                             r=1e-18,
                         )
                         paths0.append(path_ij)
                         # This ensures that the largest families still have reasonable runtimes
-                        if len(paths0) > 5:
+                        if len(paths0) > 2:
                             break
                 # Isolate the recombinations here ...
                 mat_rec, pat_rec, _, _ = hmm.isolate_recomb(paths0[0], paths0[1:])
