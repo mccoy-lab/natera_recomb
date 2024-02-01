@@ -108,44 +108,38 @@ if __name__ == "__main__":
     recomb_dict = {}
     lines = []
     for c in tqdm(snakemake.params["chroms"]):
-        cur_names = euploid_per_chrom(aneuploidy_df, names, chrom=c, pp_thresh=snakemake.params["ppThresh"])
+        cur_names = euploid_per_chrom(
+            aneuploidy_df, names, chrom=c, pp_thresh=snakemake.params["ppThresh"]
+        )
         mat_haps, pat_haps, bafs, real_names, pos = prep_data(
             family_dict=family_data, chrom=c, names=cur_names
         )
         nsibs = len(real_names)
         if nsibs >= 3:
-            pi0_ests = np.zeros(nsibs)
-            sigma_ests = np.zeros(nsibs)
-            for i in range(nsibs):
-                pi0_est, sigma_est = hmm_dis.est_sigma_pi0(
-                    bafs=bafs[i][::5],
-                    pos=pos[::5],
-                    mat_haps=mat_haps[:, ::5],
-                    pat_haps=pat_haps[:, ::5],
-                    algo="Powell",
-                    r=1e-8,
-                )
-                pi0_ests[i] = pi0_est
-                sigma_ests[i] = sigma_est
-            # Apply the phase correction method here ...
-            phase_correct = PhaseCorrect(mat_haps=mat_haps, pat_haps=pat_haps)
+            phase_correct = PhaseCorrect(mat_haps=mat_haps, pat_haps=pat_haps, pos=pos)
             phase_correct.add_baf(bafs)
-            phase_correct.phase_correct(
-                pi0=np.median(pi0_ests), std_dev=np.median(sigma_ests)
-            )
-            phase_correct.phase_correct(
-                maternal=False, pi0=np.median(pi0_ests), std_dev=np.median(sigma_ests)
-            )
+            phase_correct.est_sigma_pi0s()
+            (
+                mat_haps,
+                pat_haps,
+                n_mis_mat_tot,
+                n_mis_pat_tot,
+            ) = phase_correct.viterbi_phase_correct(niter=2)
+            pi0_ests = phase_correct.embryo_pi0s
+            sigma_ests = phase_correct.embryo_sigmas
             recomb_dict[c] = {}
-            # Use the least noisy siblings to help with estimation here ... 
+            # Use the least noisy siblings to help with estimation here ...
             idxs = np.argsort(sigma_ests)
             for i in range(nsibs):
                 paths0 = []
                 for j in idxs:
                     if j != i:
                         path_ij = hmm.map_path(
-                            bafs=[bafs[i], bafs[j]],
-                            pos=pos,
+                            bafs=[
+                                phase_correct.embryo_bafs[i],
+                                phase_correct.embryo_bafs[j],
+                            ],
+                            pos=phase_correct.pos,
                             mat_haps=phase_correct.mat_haps_fixed,
                             pat_haps=phase_correct.pat_haps_fixed,
                             pi0=(pi0_ests[i], pi0_ests[j]),
