@@ -10,7 +10,7 @@ from io import StringIO
 
 # ---- Parameters for inference in Natera Data ---- #
 metadata_file = "../../data/spectrum_metadata_merged.csv"
-aneuploidy_calls = "/data/rmccoy22/natera_spectrum/karyohmm_outputs/compiled_output/natera_embryos.karyohmm_v18.bph_sph_trisomy.full_annotation.112023.tsv.gz"
+aneuploidy_calls = "/data/rmccoy22/natera_spectrum/karyohmm_outputs/compiled_output/natera_embryos.karyohmm_v18.bph_sph_trisomy.full_annotation.112023.filter_bad_trios.tsv.gz"
 
 # Create the VCF data dictionary for each chromosome ...
 vcf_dict = {}

@@ -30,15 +30,12 @@ if __name__ == "__main__":
     hmm = QuadHMM()
     # Read in the input data and params ...
     baf_data = np.load(snakemake.input["baf"])
-    r = 1e-4
+    r = 1e-8
     if "r" in snakemake.params:
         r = 10 ** snakemake.params["r"]
-    if "pos" in baf_data:
-        pos = baf_data["pos"]
-        m = pos.size
-        bp_len_mb = (np.max(pos) - np.min(pos)) / 1e6
-        # Set the recombination distance in Morgans
-        r = (0.01 * bp_len_mb) / m
+    assert "pos" in baf_data
+    pos = baf_data["pos"]
+    m = pos.size
     assert "nsibs" in baf_data
     assert baf_data["nsibs"] >= 3
     nsibs = baf_data["nsibs"]
@@ -61,12 +58,13 @@ if __name__ == "__main__":
     i = 0
     for j in range(1, nsibs):
         # NOTE: we don't employ the parameter inference step here but assume that it has been done slightly earlier in a disomy model
-        pi0_x = np.median([est_pi0s[i], est_pi0s[j]])
-        sigma_x = np.median([est_sigmas[i], est_sigmas[j]])
+        pi0_x = (est_pi0s[i], est_pi0s[j])
+        sigma_x = (est_sigmas[i], est_sigmas[j])
         path01 = hmm.map_path(
             bafs=[baf_data[f"baf_embryo{i}"], baf_data[f"baf_embryo{j}"]],
             mat_haps=mat_haps,
             pat_haps=pat_haps,
+            pos=pos,
             std_dev=sigma_x,
             pi0=pi0_x,
             r=r,
@@ -76,6 +74,7 @@ if __name__ == "__main__":
             bafs=[baf_data[f"baf_embryo{i}"], baf_data[f"baf_embryo{j}"]],
             mat_haps=baf_data["mat_haps_true"],
             pat_haps=baf_data["pat_haps_true"],
+            pos=pos,
             std_dev=sigma_x,
             pi0=pi0_x,
             r=r,
@@ -98,8 +97,6 @@ if __name__ == "__main__":
 
     res_dict[f"pi0_{i}"] = est_pi0s
     res_dict[f"sigma_{i}"] = est_sigmas
-
-    if "pos" in baf_data:
-        res_dict["pos"] = baf_data["pos"]
+    res_dict["pos"] = baf_data["pos"]
     # Write out the hmm results to a compressed readout ...
     np.savez_compressed(snakemake.output["hmm_out"], **res_dict)

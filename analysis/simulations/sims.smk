@@ -45,7 +45,7 @@ rule correct_parental_phase:
     input:
         sim="results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
     output:
-        phase_correct="results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.phase_correct.npz",
+        phase_correct="results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.lod{lod_phase}.phase_correct.npz",
     wildcard_constraints:
         m="\d+",
         p="\d+",
@@ -55,6 +55,7 @@ rule correct_parental_phase:
     params:
         r=-4,
         log_prob=np.log(0.01),
+        lod_phase = lambda wildcards: wildcards.lod_phase == "1"
     script:
         "scripts/phase_correct.py"
 
@@ -81,11 +82,11 @@ rule isolate_true_crossover:
 
 
 rule estimate_co_hmm:
-    """Estimate crossover and their locations using the viterbi algorithm."""
+    """Estimate crossover and their locations using multiple path traces."""
     input:
-        baf="results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.phase_correct.npz",
+        baf="results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.lod{lod_phase}.phase_correct.npz",
     output:
-        hmm_out="results/sims/inferhmm_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.corr{corr}.npz",
+        hmm_out="results/sims/inferhmm_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.lod{lod_phase}.corr{corr}.npz",
     wildcard_constraints:
         corr="0|1",
     params:
@@ -98,11 +99,11 @@ rule estimate_co_hmm:
 rule concat_true_inferred:
     """Create a table which contatenates the true and inferred results."""
     input:
-        infer_co="results/sims/inferhmm_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.corr{corr}.npz",
+        infer_co="results/sims/inferhmm_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.lod{lod_phase}.corr{corr}.npz",
         true_co="results/sims/true_co_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
     output:
         co_tsv=temp(
-            "results/sims/co_compare_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.corr{corr}.tsv"
+            "results/sims/co_compare_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.lod{lod_phase}.corr{corr}.tsv"
         ),
     wildcard_constraints:
         rep="\d+",
@@ -113,6 +114,7 @@ rule concat_true_inferred:
         p="\d+",
         prop="\d+",
         corr="0|1",
+        lod_phase="0|1"
     run:
         filt_infer_data = np.load(input.infer_co)
         true_data = np.load(input.true_co)
@@ -124,9 +126,10 @@ rule concat_true_inferred:
         phase_err = int(wildcards.p) / 1000
         r_hat = filt_infer_data["r"]
         corr = int(wildcards.corr) == 1
+        lod_phase = int(wildcards.lod_phase) == 1
         with open(output.co_tsv, "w+") as out:
             out.write(
-                "rep\tpi0\tsigma\tm\tphase_err\tcorrected\tnsibs\tsib_index\tr_hat\tpi0_sib\tsigma_sib\ttrue_co_mat\tinf_co_mat\tinf_co_mat_truehap\ttrue_co_pat\tinf_co_pat\tinf_co_pat_truehap\n"
+                "rep\tpi0\tsigma\tm\tphase_err\tcorrected\tlod_phase\tnsibs\tsib_index\tr_hat\tpi0_sib\tsigma_sib\ttrue_co_mat\tinf_co_mat\tinf_co_mat_truehap\ttrue_co_pat\tinf_co_pat\tinf_co_pat_truehap\n"
             )
             i = 0
             cos_pos_mat = ",".join([str(x) for x in true_data[f"cos_pos_mat_{i}"]])
@@ -142,7 +145,7 @@ rule concat_true_inferred:
             pi0_sib = np.mean(filt_infer_data[f"pi0_{i}"])
             sigma_sib = np.mean(filt_infer_data[f"sigma_{i}"])
             out.write(
-                f"{rep}\t{pi0}\t{std}\t{m}\t{phase_err}\t{corr}\t{nsibs}\t{i}\t{r_hat}\t{pi0_sib}\t{sigma_sib}\t{cos_pos_mat}\t{mat_rec_filt}\t{mat_rec_truehap}\t{cos_pos_pat}\t{pat_rec_filt}\t{pat_rec_truehap}\n"
+                f"{rep}\t{pi0}\t{std}\t{m}\t{phase_err}\t{corr}\t{lod_phase}\t{nsibs}\t{i}\t{r_hat}\t{pi0_sib}\t{sigma_sib}\t{cos_pos_mat}\t{mat_rec_filt}\t{mat_rec_truehap}\t{cos_pos_pat}\t{pat_rec_filt}\t{pat_rec_truehap}\n"
             )
 
 
@@ -150,7 +153,7 @@ rule collect_crossover_results:
     """Collection rule for the full set of simulations."""
     input:
         co_res=expand(
-            "results/sims/co_compare_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.corr{corr}.tsv",
+            "results/sims/co_compare_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.lod{lod_phase}.corr{corr}.tsv",
             rep=range(config["co_sims"]["reps"]),
             pi0=config["co_sims"]["pi0"],
             std=config["co_sims"]["std_dev"],
@@ -158,6 +161,7 @@ rule collect_crossover_results:
             p=config["co_sims"]["phase_err"],
             nsibs=config["co_sims"]["nsibs"],
             corr=["0", "1"],
+            lod_phase=["0", "1"]
         ),
     output:
         tsv="results/sims/total_co_sims.tsv.gz",

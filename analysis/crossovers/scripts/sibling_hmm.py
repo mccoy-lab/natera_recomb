@@ -119,10 +119,11 @@ if __name__ == "__main__":
             for i in range(nsibs):
                 pi0_est, sigma_est = hmm_dis.est_sigma_pi0(
                     bafs=bafs[i][::5],
+                    pos=pos[::5],
                     mat_haps=mat_haps[:, ::5],
                     pat_haps=pat_haps[:, ::5],
                     algo="Powell",
-                    r=1e-4,
+                    r=1e-8,
                 )
                 pi0_ests[i] = pi0_est
                 sigma_ests[i] = sigma_est
@@ -144,11 +145,12 @@ if __name__ == "__main__":
                     if j != i:
                         path_ij = hmm.map_path(
                             bafs=[bafs[i], bafs[j]],
+                            pos=pos,
                             mat_haps=phase_correct.mat_haps_fixed,
                             pat_haps=phase_correct.pat_haps_fixed,
                             pi0=(pi0_ests[i], pi0_ests[j]),
                             std_dev=(sigma_ests[i], sigma_ests[j]),
-                            r=1e-18,
+                            r=1e-8,
                         )
                         paths0.append(path_ij)
                         # This ensures that the largest families still have reasonable runtimes
