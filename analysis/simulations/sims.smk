@@ -179,7 +179,7 @@ rule evaluate_phase_correction:
     input:
         sim="results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
     output:
-        tsv="results/phase_correct/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.tsv",
+        tsv="results/phase_correct/tsvs/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.tsv",
     params:
         m=lambda wildcards: int(wildcards.m),
         phase_err=lambda wildcards: int(wildcards.p) / 1000,
@@ -197,7 +197,7 @@ rule evaluate_phase_correction:
 rule concat_switch_error:
     input:
         phase_err=expand(
-            "results/phase_correct/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.tsv",
+            "results/phase_correct/tsvs/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.tsv",
             rep=range(config["co_sims"]["reps"]),
             pi0=config["phase_err"]["pi0"],
             std=config["phase_err"]["std_dev"],
