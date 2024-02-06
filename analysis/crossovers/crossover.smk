@@ -216,6 +216,7 @@ rule est_crossover_euploid_chrom_trio:
         chroms=chroms,
         ppThresh=0.95,
     resources:
+        partition="parallel",
         time="3:00:00",
         mem_mb="10G",
     script:
