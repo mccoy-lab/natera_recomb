@@ -10,7 +10,7 @@ from io import StringIO
 
 # ---- Parameters for inference in Natera Data ---- #
 metadata_file = "../../data/spectrum_metadata_merged.csv"
-aneuploidy_calls = "/data/rmccoy22/natera_spectrum/karyohmm_outputs/compiled_output/natera_embryos.karyohmm_v18.bph_sph_trisomy.full_annotation.112023.filter_bad_trios.tsv.gz"
+aneuploidy_calls = "/data/rmccoy22/natera_spectrum/karyohmm_outputs/compiled_output/natera_embryos.karyohmm_v20.020724.tsv.gz"
 
 # Create the VCF data dictionary for each chromosome ...
 vcf_dict = {}
@@ -171,7 +171,7 @@ def define_triplets(
     mother_id,
     father_id,
     trio_file="results/natera_inference/valid_trios.triplets.txt",
-    base_path="/home/abiddan1/scratch16/natera_aneuploidy/analysis/aneuploidy/results/november_inference",
+    base_path="/home/abiddan1/scratch16/natera_aneuploidy/analysis/aneuploidy/results/natera_inference",
 ):
     trio_df = pd.read_csv(trio_file, sep="\t")
     filt_df = trio_df[(trio_df.mother == mother_id) & (trio_df.father == father_id)]
@@ -214,7 +214,7 @@ rule est_crossover_euploid_chrom_trio:
         recomb_paths="results/natera_inference/{mother}+{father}.recomb_paths.pkl.gz",
     params:
         chroms=chroms,
-        ppThresh=0.95,
+        ppThresh=0.90,
     resources:
         partition="parallel",
         time="3:00:00",

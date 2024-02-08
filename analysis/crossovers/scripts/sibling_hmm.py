@@ -174,6 +174,15 @@ if __name__ == "__main__":
                     lines.append(
                         f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tpaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{pi0_ests[i]}\t{sigma_ests[i]}\n'
                     )
+                # NOTE: Cases of no crossover recombination as well ...
+                if mat_rec is []:
+                    lines.append(
+                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tmaternal\t{nan}\t{nan}\t{nan}\t{pi0_ests[i]}\t{sigma_ests[i]}\n'
+                    )   
+                if pat_rec is []:
+                    lines.append(
+                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tpaternal\t{nan}\t{nan}\t{nan}\t{pi0_ests[i]}\t{sigma_ests[i]}\n'
+                    )
         else:
             pass
     # Write out the path dictionary with the viterbi traces
