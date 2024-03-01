@@ -9,6 +9,7 @@ configfile: "config.yaml"
 rule all:
     input:
         "results/sims/total_co_sims.tsv.gz",
+        "results/phase_correct/total_phase_err.tsv.gz",
 
 
 rule sim_siblings:
@@ -55,7 +56,7 @@ rule correct_parental_phase:
     params:
         r=-4,
         log_prob=np.log(0.01),
-        lod_phase = lambda wildcards: wildcards.lod_phase == "1"
+        lod_phase=lambda wildcards: wildcards.lod_phase == "1",
     script:
         "scripts/phase_correct.py"
 
@@ -114,7 +115,7 @@ rule concat_true_inferred:
         p="\d+",
         prop="\d+",
         corr="0|1",
-        lod_phase="0|1"
+        lod_phase="0|1",
     run:
         filt_infer_data = np.load(input.infer_co)
         true_data = np.load(input.true_co)
@@ -161,13 +162,54 @@ rule collect_crossover_results:
             p=config["co_sims"]["phase_err"],
             nsibs=config["co_sims"]["nsibs"],
             corr=["0", "1"],
-            lod_phase=["0", "1"]
+            lod_phase=["0", "1"],
         ),
     output:
         tsv="results/sims/total_co_sims.tsv.gz",
     run:
         dfs = []
         for fp in input.co_res:
+            dfs.append(pd.read_csv(fp, sep="\t"))
+        tot_df = pd.concat(dfs)
+        tot_df.to_csv(output.tsv, sep="\t", index=None)
+
+
+# ------ Experiment: Phase Correction -------- #
+rule evaluate_phase_correction:
+    input:
+        sim="results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
+    output:
+        tsv="results/phase_correct/tsvs/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.tsv",
+    params:
+        m=lambda wildcards: int(wildcards.m),
+        phase_err=lambda wildcards: int(wildcards.p) / 1000,
+        nsib=lambda wildcards: int(wildcards.nsibs),
+        pi0=lambda wildcards: int(wildcards.pi0) / 100,
+        sigma=lambda wildcards: int(wildcards.std) / 100,
+        sfs=config["afs"],
+        seed=lambda wildcards: int(wildcards.rep)
+        + int(wildcards.pi0) * 3
+        + int(wildcards.std) * 5,
+    script:
+        "scripts/switch_error.py"
+
+
+rule concat_switch_error:
+    input:
+        phase_err=expand(
+            "results/phase_correct/tsvs/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.tsv",
+            rep=range(config["co_sims"]["reps"]),
+            pi0=config["phase_err"]["pi0"],
+            std=config["phase_err"]["std_dev"],
+            m=config["phase_err"]["m"],
+            p=config["phase_err"]["phase_err"],
+            nsibs=config["phase_err"]["nsibs"],
+        ),
+    output:
+        tsv="results/phase_correct/total_phase_err.tsv.gz",
+    run:
+        dfs = []
+        for fp in input.phase_err:
             dfs.append(pd.read_csv(fp, sep="\t"))
         tot_df = pd.concat(dfs)
         tot_df.to_csv(output.tsv, sep="\t", index=None)
