@@ -83,7 +83,7 @@ def extract_parameters(aneuploidy_df, mother, father, names, chrom):
     sigma_bafs = np.zeros(len(names))
     for i, n in enumerate(names):
         pi0_baf_test = filt_df[(filt_df.child == n)].pi0_baf.values[0]
-        sigma_baf_test = filt_df[(filt_df.child == n)].pi0_baf.values[0]
+        sigma_baf_test = filt_df[(filt_df.child == n)].sigma_baf.values[0]
         pi0_bafs[i] = pi0_baf_test
         sigma_bafs[i] = sigma_baf_test
     assert np.all(pi0_bafs > 0)
