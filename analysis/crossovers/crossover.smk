@@ -10,7 +10,7 @@ from io import StringIO
 
 # ---- Parameters for inference in Natera Data ---- #
 metadata_file = "../../data/spectrum_metadata_merged.csv"
-aneuploidy_calls = "/data/rmccoy22/natera_spectrum/karyohmm_outputs/compiled_output/natera_embryos.karyohmm_v20.020724.tsv.gz"
+aneuploidy_calls = "/data/rmccoy22/natera_spectrum/karyohmm_outputs/compiled_output/natera_embryos.karyohmm_v30a.031624.tsv.gz"
 
 # Create the VCF data dictionary for each chromosome ...
 vcf_dict = {}
@@ -100,6 +100,10 @@ if Path("results/natera_inference/valid_trios.triplets.txt").is_file():
 # ------- Rules Section ------- #
 localrules:
     all,
+    generate_parent_sample_list,
+    obtain_valid_trios,
+    filter_triplet_pairs,
+    filter_putative_euploid_triplets,
 
 
 rule all:
@@ -162,7 +166,7 @@ rule filter_putative_euploid_triplets:
     output:
         euploid_triplets="results/natera_inference/valid_trios.triplets.euploid.txt",
     params:
-        ppThresh=0.95,
+        ppThresh=0.90,
     script:
         "scripts/filter_euploid.py"
 
@@ -193,7 +197,7 @@ rule est_params_euploid_chrom_trio:
         est_params="results/natera_inference/{mother}+{father}.est_params.tsv",
     params:
         chroms=chroms,
-        ppThresh=0.95,
+        ppThresh=0.90,
     resources:
         time="3:00:00",
         mem_mb="5G",
@@ -216,8 +220,7 @@ rule est_crossover_euploid_chrom_trio:
         chroms=chroms,
         ppThresh=0.90,
     resources:
-        partition="parallel",
-        time="3:00:00",
+        time="2:00:00",
         mem_mb="10G",
     script:
         "scripts/sibling_hmm.py"
