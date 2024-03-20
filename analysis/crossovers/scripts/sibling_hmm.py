@@ -20,7 +20,9 @@ def load_baf_data(baf_pkls):
     return family_data
 
 
-def euploid_per_chrom(aneuploidy_df, names, chrom="chr1", pp_thresh=0.95):
+def euploid_per_chrom(
+    aneuploidy_df, mother, father, names, chrom="chr1", pp_thresh=0.95
+):
     """Return only the euploid embryo names for this chromosome."""
     assert "bf_max_cat" in aneuploidy_df.columns
     assert "mother" in aneuploidy_df.columns
@@ -29,7 +31,9 @@ def euploid_per_chrom(aneuploidy_df, names, chrom="chr1", pp_thresh=0.95):
     assert "2" in aneuploidy_df.columns
     assert len(names) > 1
     filt_names = aneuploidy_df[
-        (aneuploidy_df.child.isin(names))
+        (aneuploidy_df.mother == mother)
+        & (aneuploidy_df.father == father)
+        & (aneuploidy_df.child.isin(names))
         & (aneuploidy_df.chrom == chrom)
         & (aneuploidy_df["2"] >= pp_thresh)
     ].child.values
@@ -66,6 +70,25 @@ def prep_data(family_dict, names, chrom="chr21"):
         # NOTE: this only happens when we have all embryos as aneuploid for the chromosome.
         pass
     return mat_haps, pat_haps, bafs, real_names, pos
+
+
+def extract_parameters(aneuploidy_df, mother, father, names, chrom):
+    """Extract the core parameters for inference from the aneuploidy data frame."""
+    filt_df = aneuploidy_df[
+        (aneuploidy_df.mother == mother)
+        & (aneuploidy_df.father == father)
+        & (aneuploidy_df.chrom == chrom)
+    ]
+    pi0_bafs = np.zeros(len(names))
+    sigma_bafs = np.zeros(len(names))
+    for i, n in enumerate(names):
+        pi0_baf_test = filt_df[(filt_df.child == n)].pi0_baf.values[0]
+        sigma_baf_test = filt_df[(filt_df.child == n)].pi0_baf.values[0]
+        pi0_bafs[i] = pi0_baf_test
+        sigma_bafs[i] = sigma_baf_test
+    assert np.all(pi0_bafs > 0)
+    assert np.all(sigma_bafs > 0)
+    return pi0_bafs, sigma_bafs
 
 
 def find_nearest_het(idx, pos, haps):
@@ -109,7 +132,12 @@ if __name__ == "__main__":
     lines = []
     for c in tqdm(snakemake.params["chroms"]):
         cur_names = euploid_per_chrom(
-            aneuploidy_df, names, chrom=c, pp_thresh=snakemake.params["ppThresh"]
+            aneuploidy_df,
+            mother=snakemake.wildcards["mother"],
+            father=snakemake.wildcards["father"],
+            names=names,
+            chrom=c,
+            pp_thresh=snakemake.params["ppThresh"],
         )
         mat_haps, pat_haps, bafs, real_names, pos = prep_data(
             family_dict=family_data, chrom=c, names=cur_names
@@ -118,7 +146,19 @@ if __name__ == "__main__":
         if nsibs >= 3:
             phase_correct = PhaseCorrect(mat_haps=mat_haps, pat_haps=pat_haps, pos=pos)
             phase_correct.add_baf(bafs)
-            phase_correct.est_sigma_pi0s()
+            # NOTE: we should use these estimates from the previous HMM runs rather than re-estimating ...
+            if snakemake.params["use_prev_params"]:
+                pi0_est_acc, sigma_est_acc = extract_parameters(
+                    aneuploidy_df,
+                    mother=snakemake.wildcards["mother"],
+                    father=snakemake.wildcards["father"],
+                    names=real_names,
+                    chrom=c,
+                )
+                phase_correct.embryo_pi0s = pi0_est_acc
+                phase_correct.embryo_sigmas = sigma_est_acc
+            else:
+                phase_correct.est_sigma_pi0s()
             (
                 mat_haps,
                 pat_haps,

@@ -218,6 +218,7 @@ rule est_crossover_euploid_chrom_trio:
         recomb_paths="results/natera_inference/{mother}+{father}.recomb_paths.pkl.gz",
     params:
         chroms=chroms,
+        use_prev_params=True,
         ppThresh=0.90,
     resources:
         time="2:00:00",
