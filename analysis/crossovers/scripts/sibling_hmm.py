@@ -174,7 +174,7 @@ if __name__ == "__main__":
                 paths0 = []
                 for j in idxs:
                     if j != i:
-                        path_ij = hmm.map_path(
+                        path_ij = hmm.viterbi_path(
                             bafs=[
                                 phase_correct.embryo_bafs[i],
                                 phase_correct.embryo_bafs[j],
@@ -191,7 +191,9 @@ if __name__ == "__main__":
                         if len(paths0) > 2:
                             break
                 # Isolate the recombinations here ...
-                mat_rec, pat_rec, _, _ = hmm.isolate_recomb(paths0[0], paths0[1:])
+                mat_rec, pat_rec, _, _ = hmm.isolate_recomb(
+                    paths0[0], paths0[1:], window=50
+                )
                 recomb_dict[c][f"{real_names[i]}"] = {
                     "pos": pos,
                     "paths": paths0,
