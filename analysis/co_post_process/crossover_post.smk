@@ -17,22 +17,27 @@ chroms = [f"chr{i}" for i in range(1, 23)]
 rule all:
     input:
         expand(
-            "results/xo_interference/{name}.age_xo_interference.{recmap}.{chrom}.tsv",
+            "results/{name}.crossover_filt.{recmap}.euploid_only.tsv.gz",
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
-            chrom=["chr4", "chr10", "chr22"],
         ),
-        expand(
-            "results/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-rates.txt",
-            sex=["maternal", "paternal"],
-            raw=["raw", "split"],
-            name=config["crossover_data"].keys(),
-            chrom=["chr4", "chr10", "chr22"],
-        ),
+        # expand(
+        #     "results/xo_interference/{name}.age_xo_interference.{recmap}.{chrom}.tsv",
+        #     name=config["crossover_data"].keys(),
+        #     recmap=config["recomb_maps"].keys(),
+        #     chrom=["chr4", "chr10", "chr22"],
+        # ),
+        # expand(
+        #     "results/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-rates.txt",
+        #     sex=["maternal", "paternal"],
+        #     raw=["raw", "split"],
+        #     name=config["crossover_data"].keys(),
+        #     chrom=["chr4", "chr10", "chr22"],
+        # ),
 
 
 rule filter_co_dataset:
-    """Filter a crossover dataset according to our key criteria."""
+    """Filter a crossover dataset according to the primary criteria."""
     input:
         crossover_data=lambda wildcards: config["crossover_data"][wildcards.name],
     output:
@@ -41,29 +46,58 @@ rule filter_co_dataset:
         import pandas as pd
 
         co_df = pd.read_csv(input.crossover_data, sep="\t")
-        co_df.drop_duplicates(
-            ["mother", "father", "child", "crossover_sex", "min_pos", "max_pos"],
-            inplace=True,
+        co_df["uid"] = co_df["mother"] + co_df["father"] + co_df["child"]
+        co_df["valid_co"] = ~co_df.duplicated(
+            ["uid", "chrom", "crossover_sex", "min_pos", "max_pos"], keep=False
         )
-        co_df.to_csv(output.co_filt_data, sep="\t", index=None)
+        valid_co_df = co_df[co_df["valid_co"]]
+        valid_co_df.to_csv(output.co_filt_data, sep="\t", index=None)
+
+
+rule isolate_euploid_crossovers:
+    """Isolate only the euploid chromosomes."""
+    input:
+        aneuploidy_tsv=config["aneuploidy_data"],
+        co_filt_tsv="results/{name}.crossover_filt.tsv.gz",
+    output:
+        co_euploid_filt_tsv="results/{name}.crossover_filt.euploid_only.tsv.gz",
+    params:
+        ppThresh=0.90,
+    script:
+        "scripts/isolate_euploids.py"
 
 
 rule interpolate_co_locations:
     """Interpolate the locations of crossovers from crossover specific maps."""
     input:
-        co_map="results/{name}.crossover_filt.tsv.gz",
+        co_map="results/{name}.crossover_filt.euploid_only.tsv.gz",
         recmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
     output:
-        co_map_interp="results/{name}.crossover_filt.{recmap}.tsv.gz",
+        co_map_interp="results/{name}.crossover_filt.{recmap}.euploid_only.tsv.gz",
     script:
         "scripts/interp_recmap.py"
 
 
-# ------- Analysis 1. Estimate Crossover Interference Stratified by Age & Sex -------- #
+rule intersect_w_metadata:
+    """Intersect the crossover data with the resulting metadata."""
+    input:
+        co_map_interp_tsv="results/{name}.crossover_filt.{recmap}.euploid_only.tsv.gz",
+        meta_tsv = config['metadata']
+    output:
+        "results/{name}.crossover_filt.{recmap}.euploid_only.tsv.gz"
+    run:
+        import pandas as pd
+        meta_df = pd.read_csv(snakemake.input['meta_tsv'], sep="\t")
+        co_df = pd.read_csv(snakemake.input['co_map_interp_tsv'], sep="\t")
+        
+
+
+
+# ------- Analysis 1b. Estimate Crossover Interference Stratified by Age & Sex -------- #
 rule age_sex_stratified_co_interference:
     input:
         metadata=config["metadata"],
-        co_map_interp="results/{name}.crossover_filt.{recmap}.tsv.gz",
+        co_map_interp="results/{name}.crossover_filt.{recmap}.euploid_only.tsv.gz",
         recmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
     output:
         age_sex_interference="results/xo_interference/{name}.age_xo_interference.{recmap}.{chrom}.tsv",
