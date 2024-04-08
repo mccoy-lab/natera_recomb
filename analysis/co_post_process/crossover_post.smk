@@ -17,9 +17,10 @@ chroms = [f"chr{i}" for i in range(1, 23)]
 rule all:
     input:
         expand(
-            "results/{name}.crossover_filt.{recmap}.euploid_only.tsv.gz",
+            "results/{name}.crossover_filt.{recmap}.{ploid}_only.meta.tsv.gz",
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
+            ploid="euploid",
         ),
         # expand(
         #     "results/xo_interference/{name}.age_xo_interference.{recmap}.{chrom}.tsv",
@@ -61,6 +62,7 @@ rule isolate_euploid_crossovers:
         co_filt_tsv="results/{name}.crossover_filt.tsv.gz",
     output:
         co_euploid_filt_tsv="results/{name}.crossover_filt.euploid_only.tsv.gz",
+        co_aneuploid_filt_tsv="results/{name}.crossover_filt.aneuploid_only.tsv.gz",
     params:
         ppThresh=0.90,
     script:
@@ -81,16 +83,36 @@ rule interpolate_co_locations:
 rule intersect_w_metadata:
     """Intersect the crossover data with the resulting metadata."""
     input:
-        co_map_interp_tsv="results/{name}.crossover_filt.{recmap}.euploid_only.tsv.gz",
-        meta_tsv = config['metadata']
+        co_map_interp_tsv="results/{name}.crossover_filt.{recmap}.{ploid}_only.tsv.gz",
+        meta_tsv=config["metadata"],
+    wildcard_constraints:
+        ploid="euploid|aneuploid",
     output:
-        "results/{name}.crossover_filt.{recmap}.euploid_only.tsv.gz"
+        co_meta_map_tsv="results/{name}.crossover_filt.{recmap}.{ploid}_only.meta.tsv.gz",
     run:
         import pandas as pd
-        meta_df = pd.read_csv(snakemake.input['meta_tsv'], sep="\t")
-        co_df = pd.read_csv(snakemake.input['co_map_interp_tsv'], sep="\t")
-        
 
+        meta_df = pd.read_csv(input.meta_tsv, sep="\t")
+        co_df = pd.read_csv(input.co_map_interp_tsv, sep="\t")
+        # Only get the mother data ...
+        meta_mother_df = (
+            meta_df[meta_df.family_position == "mother"][
+                [
+                    "array",
+                    "patient_age",
+                    "partner_age",
+                    "egg_donor_bool",
+                    "sperm_donor_bool",
+                    "year",
+                ]
+            ]
+            .groupby("array")
+            .agg("median")
+            .reset_index()
+        )
+        meta_mother_df.rename(columns={"array": "mother"}, inplace=True)
+        merged_meta_valid_co_df = valid_co_df.merge(meta_mother_df, how="left")
+        merged_meta_valid_co_df.to_csv(output.co_meta_map_tsv, index=None, sep="\t")
 
 
 # ------- Analysis 1b. Estimate Crossover Interference Stratified by Age & Sex -------- #

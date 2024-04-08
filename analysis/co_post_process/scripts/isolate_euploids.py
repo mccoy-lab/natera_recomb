@@ -29,3 +29,6 @@ if __name__ == "__main__":
     co_df[co_df.uid.isin(euploid_embryo_id)].to_csv(
         snakemake.output["co_euploid_filt_tsv"], index=False, sep="\t"
     )
+    co_df[~co_df.uid.isin(euploid_embryo_id)].to_csv(
+        snakemake.output["co_aneuploid_filt_tsv"], index=False, sep="\t"
+    )
