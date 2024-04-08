@@ -22,21 +22,24 @@ rule all:
             recmap=config["recomb_maps"].keys(),
             ploid="euploid",
         ),
-        # expand(
-        #     "results/xo_interference/{name}.age_xo_interference.{recmap}.{chrom}.tsv",
-        #     name=config["crossover_data"].keys(),
-        #     recmap=config["recomb_maps"].keys(),
-        #     chrom=["chr4", "chr10", "chr22"],
-        # ),
-        # expand(
-        #     "results/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-rates.txt",
-        #     sex=["maternal", "paternal"],
-        #     raw=["raw", "split"],
-        #     name=config["crossover_data"].keys(),
-        #     chrom=["chr4", "chr10", "chr22"],
-        # ),
 
 
+# expand(
+#     "results/xo_interference/{name}.age_xo_interference.{recmap}.{chrom}.tsv",
+#     name=config["crossover_data"].keys(),
+#     recmap=config["recomb_maps"].keys(),
+#     chrom=["chr4", "chr10", "chr22"],
+# ),
+# expand(
+#     "results/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-rates.txt",
+#     sex=["maternal", "paternal"],
+#     raw=["raw", "split"],
+#     name=config["crossover_data"].keys(),
+#     chrom=["chr4", "chr10", "chr22"],
+# ),
+
+
+# ---------------- Analysis 1a. Conduct preprocessing analyses. -------- #
 rule filter_co_dataset:
     """Filter a crossover dataset according to the primary criteria."""
     input:
@@ -84,7 +87,7 @@ rule intersect_w_metadata:
     """Intersect the crossover data with the resulting metadata."""
     input:
         co_map_interp_tsv="results/{name}.crossover_filt.{recmap}.{ploid}_only.tsv.gz",
-        meta_tsv=config["metadata"],
+        meta_csv=config["metadata"],
     wildcard_constraints:
         ploid="euploid|aneuploid",
     output:
@@ -92,7 +95,9 @@ rule intersect_w_metadata:
     run:
         import pandas as pd
 
-        meta_df = pd.read_csv(input.meta_tsv, sep="\t")
+        meta_df = pd.read_csv(input.meta_csv)
+        meta_df["egg_donor_bool"] = meta_df.egg_donor == "yes"
+        meta_df["sperm_donor_bool"] = meta_df.sperm_donor == "yes"
         co_df = pd.read_csv(input.co_map_interp_tsv, sep="\t")
         # Only get the mother data ...
         meta_mother_df = (
@@ -110,8 +115,15 @@ rule intersect_w_metadata:
             .agg("median")
             .reset_index()
         )
-        meta_mother_df.rename(columns={"array": "mother"}, inplace=True)
-        merged_meta_valid_co_df = valid_co_df.merge(meta_mother_df, how="left")
+        meta_mother_df.rename(
+            columns={
+                "array": "mother",
+                "egg_donor_bool": "egg_donor",
+                "sperm_donor_bool": "sperm_donor",
+            },
+            inplace=True,
+        )
+        merged_meta_valid_co_df = co_df.merge(meta_mother_df, how="left")
         merged_meta_valid_co_df.to_csv(output.co_meta_map_tsv, index=None, sep="\t")
 
 
