@@ -71,7 +71,9 @@ if __name__ == "__main__":
     recomb_dict = {}
     lines = []
     for c in tqdm(snakemake.params["chroms"]):
-        cur_names = euploid_per_chrom(aneuploidy_df, names, chrom=c, pp_thresh=snakemake.params["ppThresh"])
+        cur_names = euploid_per_chrom(
+            aneuploidy_df, names, chrom=c, pp_thresh=snakemake.params["ppThresh"]
+        )
         nsibs = len(cur_names)
         print(c, nsibs, cur_names)
         if nsibs >= 3:

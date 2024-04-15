@@ -12,7 +12,8 @@ if __name__ == "__main__":
     assert "child" in aneuploidy_df.columns
     ppThresh = snakemake.params["ppThresh"]
     trios_data_euploid = (
-        aneuploidy_df[aneuploidy_df["2"] >= ppThresh].groupby(["mother", "father", "child"])["bf_max_cat"]
+        aneuploidy_df[aneuploidy_df["2"] >= ppThresh]
+        .groupby(["mother", "father", "child"])["bf_max_cat"]
         .agg(lambda x: np.sum(x == "2") == 22)
         .reset_index()
     )

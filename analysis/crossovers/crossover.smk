@@ -90,7 +90,9 @@ if Path("results/natera_inference/valid_trios.triplets.txt").is_file():
     with open("results/natera_inference/valid_trios.triplets.txt", "r") as fp:
         for i, line in enumerate(fp):
             [m, f, _] = line.rstrip().split()
-            total_data.append(f"results/natera_inference/{m}+{f}.est_recomb.tsv")
+            total_data.append(
+                f"results/natera_inference_heuristic/{m}+{f}.est_recomb.tsv"
+            )
             if est_params:
                 total_params.append(f"results/natera_inference/{m}+{f}.est_params.tsv")
         total_params = np.unique(total_params).tolist()
@@ -225,3 +227,24 @@ rule est_crossover_euploid_chrom_trio:
         mem_mb="10G",
     script:
         "scripts/sibling_hmm.py"
+
+
+rule est_crossover_euploid_chrom_trio_heuristic:
+    """Estimate crossover events for euploid chromosomes in trio datasets using the heuristic approach of Coop et al 2007."""
+    input:
+        triplets="results/natera_inference/valid_trios.triplets.txt",
+        baf_pkl=lambda wildcards: define_triplets(
+            mother_id=wildcards.mother, father_id=wildcards.father
+        ),
+        aneuploidy_calls=aneuploidy_calls,
+    output:
+        est_recomb="results/natera_inference_heuristic/{mother}+{father}.est_recomb.tsv",
+    params:
+        chroms=chroms,
+        use_prev_params=True,
+        ppThresh=0.90,
+    resources:
+        time="2:00:00",
+        mem_mb="10G",
+    script:
+        "scripts/sibling_rec_est.py"
