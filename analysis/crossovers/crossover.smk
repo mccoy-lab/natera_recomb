@@ -242,9 +242,10 @@ rule est_crossover_euploid_chrom_trio_heuristic:
     params:
         chroms=chroms,
         use_prev_params=True,
-        ppThresh=0.90,
+        ppThresh=0.95,
+        phaseCorrect=True,
     resources:
-        time="2:00:00",
+        time="1:00:00",
         mem_mb="10G",
     script:
         "scripts/sibling_rec_est.py"
