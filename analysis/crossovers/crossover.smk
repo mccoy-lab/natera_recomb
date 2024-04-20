@@ -242,7 +242,7 @@ rule est_crossover_euploid_chrom_trio_heuristic:
     params:
         chroms=chroms,
         use_prev_params=True,
-        ppThresh=0.95,
+        ppThresh=0.90,
         phaseCorrect=True,
     resources:
         time="1:00:00",

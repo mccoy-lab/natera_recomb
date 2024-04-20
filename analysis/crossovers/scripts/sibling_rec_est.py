@@ -80,40 +80,40 @@ if __name__ == "__main__":
             recomb_est.add_baf(embryo_bafs=expected_baf)
             for i in range(nsibs):
                 # Isolate the recombinations here ...
-                mat_rec = recomb_est.estimate_crossovers(
+                mat_rec, mat_rec_support = recomb_est.estimate_crossovers(
                     template_embryo=i, maternal=True
                 )
-                pat_rec = recomb_est.estimate_crossovers(
+                pat_rec, pat_rec_support = recomb_est.estimate_crossovers(
                     template_embryo=i, maternal=False
                 )
-                for m in mat_rec:
+                for j, m in enumerate(mat_rec):
                     left_pos, right_pos = m
                     # Take the midpoint here ...
                     rec_pos = int((left_pos + right_pos) / 2)
                     lines.append(
-                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tmaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t{pos.size}\n'
+                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tmaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t{mat_rec_support[j]}\t{pos.size}\n'
                     )
-                for p in pat_rec:
+                for j, p in enumerate(pat_rec):
                     left_pos, right_pos = p
                     rec_pos = int((left_pos + right_pos) / 2)
                     lines.append(
-                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tpaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t{pos.size}\n'
+                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tpaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t{pat_rec_support[j]}\t{pos.size}\n'
                     )
                 # NOTE: Cases of no crossover recombination detected as well ...
                 if mat_rec is []:
                     lines.append(
-                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tmaternal\t{nan}\t{nan}\t{nan}\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t{pos.size}\n'
+                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tmaternal\t{nan}\t{nan}\t{nan}\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t0\t{pos.size}\n'
                     )
                 if pat_rec is []:
                     lines.append(
-                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tpaternal\t{nan}\t{nan}\t{nan}\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t{pos.size}\n'
+                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tpaternal\t{nan}\t{nan}\t{nan}\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t0\t{pos.size}\n'
                     )
         else:
             pass
     # Write out crossover location output here ...
     with open(snakemake.output["est_recomb"], "w") as out:
         out.write(
-            "mother\tfather\tchild\tchrom\tcrossover_sex\tmin_pos\tavg_pos\tmax_pos\tavg_pi0\tavg_sigma\tnsibs\tnsnps\n"
+            "mother\tfather\tchild\tchrom\tcrossover_sex\tmin_pos\tavg_pos\tmax_pos\tavg_pi0\tavg_sigma\tnsibs\tnsib_support\tnsnps\n"
         )
         for line in lines:
             out.write(line)
