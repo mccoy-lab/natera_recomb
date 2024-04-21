@@ -89,9 +89,8 @@ def avg_dist_telomere(df, telomere_df):
     tot_df = pd.concat(mother_df, father_df)
     return tot_df
 
-
 def hotspot_occupancy(df, hotspot_df):
-    """Compute the number of crossovers that exist in hotspots."""
+    """Compute the likelihood of crossovers that exist in hotspots."""
     pass
 
 

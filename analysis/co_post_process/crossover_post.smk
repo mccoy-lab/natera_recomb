@@ -20,7 +20,7 @@ rule all:
             "results/{name}.crossover_filt.{recmap}.{ploid}_only.meta.tsv.gz",
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
-            ploid="euploid",
+            ploid=["euploid", "aneuploid"],
         ),
 
 
@@ -75,10 +75,10 @@ rule isolate_euploid_crossovers:
 rule interpolate_co_locations:
     """Interpolate the locations of crossovers from crossover specific maps."""
     input:
-        co_map="results/{name}.crossover_filt.euploid_only.tsv.gz",
+        co_map="results/{name}.crossover_filt.{ploid}_only.tsv.gz",
         recmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
     output:
-        co_map_interp="results/{name}.crossover_filt.{recmap}.euploid_only.tsv.gz",
+        co_map_interp="results/{name}.crossover_filt.{recmap}.{ploid}_only.tsv.gz",
     script:
         "scripts/interp_recmap.py"
 
@@ -130,8 +130,7 @@ rule intersect_w_metadata:
 # ------- Analysis 1b. Estimate Crossover Interference Stratified by Age & Sex -------- #
 rule age_sex_stratified_co_interference:
     input:
-        metadata=config["metadata"],
-        co_map_interp="results/{name}.crossover_filt.{recmap}.euploid_only.tsv.gz",
+        co_meta_map_tsv="results/{name}.crossover_filt.{recmap}.{ploid}_only.meta.tsv.gz",
         recmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
     output:
         age_sex_interference="results/xo_interference/{name}.age_xo_interference.{recmap}.{chrom}.tsv",

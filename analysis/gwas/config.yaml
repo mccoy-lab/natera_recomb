@@ -5,8 +5,9 @@ recomb_map: "../../data/genmaps/halldorsson19/aau1043_datas3.gz"
 bed_files:
     centromeres: "../../data/gaps/centromeres_grch38.bed"
     telomeres: "../../data/gaps/telomeres_grch38.bed"
-    hotspots: "../../data/gaps/pratto2014_dmc1_hotspots.hg38.tsv"
-datadir: "/data/rmccoy22/natera_spectrum/genotypes/imputed_parents_031423/"
+    hotspots: 
+      pratto2014: "../../data/gaps/pratto2014_dmc1_hotspots.hg38.tsv"
+datadir: "/data/rmccoy22/natera_spectrum/genotypes/imputed_parents_100423/"
 methods:
   - "plink2"
   - "regenie"

@@ -21,8 +21,6 @@ for chrom in chroms:
         chrom
     ] = f"{config['datadir']}spectrum_imputed_{chrom}_rehead_filter.vcf.gz"
 
-# f"/data/rmccoy22/natera_spectrum/genotypes/opticall_parents_031423/genotypes/eagle_phased_hg38/natera_parents.b38.chr{c}.vcf.gz"
-
 
 # ------- Rules Section ------- #
 localrules:
@@ -176,6 +174,19 @@ rule create_rec_abundance_phenotypes:
         plink_format=lambda wildcards: wildcards.format == "plink2",
     script:
         "scripts/create_rec_abundance_phenotypes.py"
+
+rule create_hotspot_phenotypes:
+    """Create hotspot-based phenotypes."""
+    input:
+        co_data = config["crossovers"],
+        hotspots = lambda wildcards: config["bed_files"]["hotspots"][wildcards.hotspots]
+    output:
+        hotspot_pheno = "results/phenotypes/{project_name}.hotspot_pheno.tsv"
+    resources:
+        time="2:00:00",
+        mem_mb="5G"
+    script:
+        "scripts/hotspot_inference.py"
 
 
 rule create_rec_location_phenotypes:
