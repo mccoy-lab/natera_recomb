@@ -12,7 +12,7 @@ from intervaltree import IntervalTree
 
 
 def create_co_intervals(co_df):
-    """Store hotspot intervals as a"""
+    """Store hotspot intervals in a dictionary of interval trees."""
     assert "chrom" in co_df.columns
     assert "start" in co_df.columns
     assert "end" in co_df.columns
@@ -116,4 +116,14 @@ def est_mle_alpha(p_overlaps, deltas, ngridpts=500):
 
 if __name__ == "__main__":
     """Actually do the full estimation routine across the crossovers for some samples."""
+    co_df = pd.read_csv(snakemake.input["co_data"], sep="\t")
+    hotspot_df = pd.read_csv(snakemake.input["hotspots"], sep="\t")
+    # Step 1: Make a dictionary of the various hotspots
+    hotspot_chrom_dict = create_co_intervals(hotspot_df)
+    co_df['uid'] = co_df['mother'] + co_df['father'] + co_df['child']
+    for uid in np.unique(co_df.uid.values):
+        cur_mat_df = co_df[(co_df.uid == uid) & (co_df.crossover_sex == "maternal")]
+        cur_pat_df = co_df[(co_df.uid == uid) & (co_df.crossover_sex == "paternal")]
+        # Obtain the maternal copies
+
     pass

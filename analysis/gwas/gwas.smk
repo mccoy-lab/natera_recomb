@@ -176,7 +176,7 @@ rule create_rec_abundance_phenotypes:
         "scripts/create_rec_abundance_phenotypes.py"
 
 rule create_hotspot_phenotypes:
-    """Create hotspot-based phenotypes."""
+    """Create phenotypes for hotspot occupancy."""
     input:
         co_data = config["crossovers"],
         hotspots = lambda wildcards: config["bed_files"]["hotspots"][wildcards.hotspots]
