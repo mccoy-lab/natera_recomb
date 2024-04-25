@@ -202,7 +202,7 @@ if __name__ == "__main__":
         .agg("mean")
         .reset_index()[["mother", "mother", "mean_alpha_mat"]]
     )
-    final_mat_df.columns = ["FID", "FID", "HotspotOccupancy"]
+    final_mat_df.columns = ["FID", "IID", "HotspotOccupancy"]
     final_pat_df = (
         tot_pat_df.groupby("father")["mean_alpha_pat"]
         .agg("mean")
