@@ -29,19 +29,24 @@ localrules:
 
 rule all:
     input:
+        #         expand(
+        # "results/gwas_output/regenie/{project_name}_{sex}_{format}_{pheno}.regenie.gz",
+        # project_name=config["project_name"],
+        # sex=["Male", "Female"],
+        # pheno=["MeanCO", "VarCO", "RandPheno"],
+        # format="regenie",
+        # ),
+        # expand(
+        # "results/gwas_output/plink2/{project_name}_{sex}_{format}.{pheno}.glm.linear",
+        # format="plink2",
+        # project_name=config["project_name"],
+        # sex=["Male", "Female"],
+        # pheno=["MeanCO", "VarCO", "RandPheno"],
+        # ),
         expand(
-            "results/gwas_output/regenie/{project_name}_{sex}_{format}_{pheno}.regenie.gz",
+            "results/phenotypes/{project_name}.{format}.hotspot.pheno",
             project_name=config["project_name"],
-            sex=["Male", "Female"],
-            pheno=["MeanCO", "VarCO", "RandPheno"],
-            format="regenie",
-        ),
-        expand(
-            "results/gwas_output/plink2/{project_name}_{sex}_{format}.{pheno}.glm.linear",
             format="plink2",
-            project_name=config["project_name"],
-            sex=["Male", "Female"],
-            pheno=["MeanCO", "VarCO", "RandPheno"],
         ),
 
 
@@ -175,51 +180,58 @@ rule create_rec_abundance_phenotypes:
     script:
         "scripts/create_rec_abundance_phenotypes.py"
 
+
 rule create_sex_specific_hotspots:
     """Create sex-specific hotspot files from Haldorsson et al 2019."""
     input:
-        genmap = lambda wildcards:  config["hotspots"][wildcards.sex]
+        genmap=lambda wildcards: config["hotspots"][wildcards.sex],
     output:
-        hotspots = "results/phenotypes/appendix/{project_name}.{sex}.hotspots.tsv"
+        hotspots="results/phenotypes/appendix/{project_name}.{sex}.hotspots.tsv",
     wildcard_constraints:
-        sex="Male|Female"
+        sex="Male|Female",
     params:
-        srr =  10
+        srr=10,
     resources:
         time="0:10:00",
-        mem_mb="4G"
+        mem_mb="4G",
     run:
         df = pd.read_csv(input.genmap, sep="\t", comment="#")
-        df['SRR'] = df.cMperMb / df.cMperMb.mean()
+        df["SRR"] = df.cMperMb / df.cMperMb.mean()
         filt_df = df[df.SRR > params.srr]
-        filt_df.rename(columns={"Chr": "chrom", "Begin": "start", "End": "end"}, inplace=True)
+        filt_df.rename(
+            columns={"Chr": "chrom", "Begin": "start", "End": "end"}, inplace=True
+        )
         filt_df.to_csv(output.hotspots, index=None, sep="\t")
+
 
 rule create_hotspot_phenotypes:
     """Create phenotypes for hotspot occupancy."""
     input:
-        co_data = config["crossovers"],
-        pratto_hotspots = lambda wildcards: config["bed_files"]["pratto2014"],
-        male_hotspots = "results/phenotypes/appendix/{project_name}.Male.hotspots.tsv", 
-        female_hotspots = "results/phenotypes/appendix/{project_name}.Female.hotspots.tsv" 
+        co_data=config["crossovers"],
+        # pratto_hotspots = lambda wildcards: config["bed_files"]["pratto2014"],
+        male_hotspots="results/phenotypes/appendix/{project_name}.Male.hotspots.tsv",
+        female_hotspots="results/phenotypes/appendix/{project_name}.Female.hotspots.tsv",
     output:
-        hotspot_pheno = "results/phenotypes/{project_name}.hotspot_pheno.tsv"
+        pheno="results/phenotypes/{project_name}.{format}.hotspot.pheno",
+        pheno_raw="results/phenotypes/{project_name}.{format}.hotspot.raw.pheno",
     resources:
         time="2:00:00",
-        mem_mb="5G"
+        mem_mb="5G",
     params:
-        max_interval = 50e3,
-        nreps = 100,
-        ngridpts = 300
+        max_interval=50e3,
+        nreps=100,
+        ngridpts=300,
+        plink_format=lambda wildcards: wildcards.format == "plink2",
     script:
         "scripts/hotspot_inference.py"
+
 
 rule create_rec_location_phenotypes:
     """Create the full quantitative phenotype."""
     input:
         co_data=config["crossovers"],
-        centromeres = config["bed_files"]["centromeres"],
-        telomeres = config["bed_files"]["telomeres"],
+        centromeres=config["bed_files"]["centromeres"],
+        telomeres=config["bed_files"]["telomeres"],
     output:
         pheno="results/phenotypes/{project_name}.{format}.location.pheno",
     resources:
@@ -236,6 +248,7 @@ rule combine_phenotypes:
     input:
         abundance_pheno="results/phenotypes/{project_name}.{format}.abundance.pheno",
         location_pheno="results/phenotypes/{project_name}.{format}.location.pheno",
+        hotspot_pheno="results/phenotypes/{project_name}.{format}.hotspot.pheno",
     output:
         pheno="results/phenotypes/{project_name}.{format}.pheno",
     resources:
@@ -246,7 +259,10 @@ rule combine_phenotypes:
     run:
         abundance_df = pd.read_csv(input.abundance_pheno, sep="\t")
         location_df = pd.read_csv(input.location_pheno, sep="\t")
-        pheno_df = abundance_df.merge(location_df)
+        hotspot_df = pd.read_csv(input.hotspot_pheno)
+        pheno_df = abundance_df.merge(location_df, on=["IID"], how="outer").merge(
+            hotspot_df, on=["IID"], how="outer"
+        )
         pheno_df.to_csv(output.pheno, sep="\t", index=None)
 
 

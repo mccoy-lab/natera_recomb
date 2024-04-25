@@ -90,11 +90,6 @@ def avg_dist_telomere(df, telomere_df):
     return tot_df
 
 
-def hotspot_occupancy(df, hotspot_df):
-    """Compute the likelihood of crossovers that exist in hotspots."""
-    pass
-
-
 if __name__ == "__main__":
     """Create several location-based phenotypes for analysis of recombination."""
     co_df = pd.read_csv(snakemake.input["co_data"], sep="\t")

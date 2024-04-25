@@ -188,3 +188,24 @@ if __name__ == "__main__":
             "nco_pass_pat",
         ],
     )
+    # Step 4: Collapse all of these into a single phenotype file
+    raw_df = res_mat_df.merge(res_pat_df, on=["uid"])
+    tot_mat_df = res_mat_df.merge(co_df[["uid", "mother"]], how="left", on=["uid"])
+    tot_pat_df = res_pat_df.merge(co_df[["uid", "father"]], how="left", on=["uid"])
+    final_mat_df = (
+        tot_mat_df.groupby("mother")["mean_alpha_mat"]
+        .agg("mean")
+        .reset_index()[["mother", "mother", "mean_alpha_mat"]]
+    )
+    final_mat_df.columns = ["FID", "FID", "HotspotOccupancy"]
+    final_pat_df = (
+        tot_pat_df.groupby("father")["mean_alpha_pat"]
+        .agg("mean")
+        .reset_index()[["father", "father", "mean_alpha_pat"]]
+    )
+    final_pat_df.columns = ["FID", "IID", "HotspotOccupancy"]
+    merged_df = pd.concat(final_mat_df, final_pat_df)
+    if snakemake.params["plink_format"]:
+        merged_df.rename(columns={"FID": "#FID"})
+    merged_df.to_csv(snakemake.output["pheno"], sep="\t", index=None)
+    raw_df.to_csv(snakemake.output["pheno_raw"], sep="\t", index=None)
