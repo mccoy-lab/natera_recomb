@@ -213,9 +213,8 @@ rule create_rec_location_phenotypes:
     """Create the full quantitative phenotype."""
     input:
         co_data=config["crossovers"],
-        centromeres = config["bed_files"]["centromeres"]
-        telomeres = config["bed_files"]["telomeres"]
-        hotspots = config["bed_files"]["hotspots"]
+        centromeres = config["bed_files"]["centromeres"],
+        telomeres = config["bed_files"]["telomeres"],
     output:
         pheno="results/phenotypes/{project_name}.{format}.location.pheno",
     resources:
