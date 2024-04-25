@@ -68,7 +68,7 @@ def est_p_overlap(rs, co_int_dict, seed=42, **kwargs):
     """Estimate the probability of overlap"""
     assert seed > 0
     np.random.seed(seed)
-    p_overlap = np.zeros(rs.shape[0])
+    p_overlap = np.zeros(len(rs))
     for i, r in enumerate(rs):
         rs_r = permute_rec_dist(r, **kwargs)
         p_overlap[i] = est_co_overlap(rs_r, co_int_dict)
@@ -96,7 +96,7 @@ def loglik_co_overlap(alpha, p_overlaps_chance, deltas):
     loglik = 0.0
     for p, d in zip(p_overlaps_chance, deltas):
         x = alpha + (1 - alpha) * p
-        loglik += np.log(x + (1 - d) * (1 - x))
+        loglik += np.log(d * x + (1 - d) * (1 - x))
     return loglik
 
 
@@ -104,7 +104,7 @@ def est_mle_alpha(p_overlaps, deltas, ngridpts=500):
     """Output the 95% confidence interval of the MLE estimate for the proportion of crossovers at hotspots."""
     assert ngridpts >= 50
     assert p_overlaps.size == deltas.size
-    alphas = np.linspace(1e-4, 1 - 1e-4, ngridpts)
+    alphas = np.linspace(1e-6, 1 - 1e-6, ngridpts)
     llgrid = np.array([loglik_co_overlap(a, p_overlaps, deltas) for a in alphas])
     mle_alpha = alphas[np.argmax(llgrid)]
     lower_95 = np.min(alphas[llgrid >= (np.max(llgrid) - 2.0)])
@@ -115,15 +115,76 @@ def est_mle_alpha(p_overlaps, deltas, ngridpts=500):
 
 
 if __name__ == "__main__":
-    """Actually do the full estimation routine across the crossovers for some samples."""
-    co_df = pd.read_csv(snakemake.input["co_data"], sep="\t")
-    hotspot_df = pd.read_csv(snakemake.input["hotspots"], sep="\t")
-    # Step 1: Make a dictionary of the various hotspots
-    hotspot_chrom_dict = create_co_intervals(hotspot_df)
-    co_df['uid'] = co_df['mother'] + co_df['father'] + co_df['child']
-    for uid in np.unique(co_df.uid.values):
-        cur_mat_df = co_df[(co_df.uid == uid) & (co_df.crossover_sex == "maternal")]
-        cur_pat_df = co_df[(co_df.uid == uid) & (co_df.crossover_sex == "paternal")]
-        # Obtain the maternal copies
+    """Actually do the full estimation routine across crossovers for each meiosis."""
 
-    pass
+    co_df = pd.read_csv(snakemake.input["co_data"], sep="\t")
+    male_hotspot_df = pd.read_csv(snakemake.input["male_hotspots"], sep="\t")
+    female_hotspot_df = pd.read_csv(snakemake.input["female_hotspots"], sep="\t")
+    pratto_hotspot_df = pd.read_csv(snakemake.input["pratto_hotspots"], sep="\t")
+
+    # Step 0: setup the parameters
+    max_interval = snakemake.params["max_interval"]
+    nreps = snakemake.params["nreps"]
+    ngridpts = snakemake.params["ngridpts"]
+
+    # Step 1: Make a dictionary of the sex-specific hotspots from
+    co_hotspot_dict_male = create_co_intervals(male_hotspot_df)
+    co_hotspot_dict_female = create_co_intervals(female_hotspot_df)
+
+    tuple_mat_df = (
+        co_df[co_df.crossover_sex == "maternal"]
+        .groupby("uid")[["chrom", "min_pos", "max_pos"]]
+        .apply(lambda x: list(tuple(x.values)))
+        .reset_index()
+    )
+    tuple_mat_df.rename(columns={0: "co_list"}, inplace=True)
+
+    tuple_pat_df = (
+        co_df[co_df.crossover_sex == "paternal"]
+        .groupby("uid")[["chrom", "min_pos", "max_pos"]]
+        .apply(lambda x: list(tuple(x.values)))
+        .reset_index()
+    )
+    tuple_pat_df.rename(columns={0: "co_list"}, inplace=True)
+
+    # Step 2: Inference for maternal crossovers ...
+    res_mat = []
+    for u, x in tqdm(zip(tuple_mat_df.uid, tuple_mat_df.co_list)):
+        co_mat_calls = [(c, s, e) for (c, s, e) in x if (e - s) < max_interval]
+        p_overlaps_prime = est_p_overlap(
+            co_mat_calls, co_hotspot_dict_female, nreps=nreps
+        )
+        deltas_prime = est_deltas(co_mat_calls, co_hotspot_dict_female)
+        alphas = est_mle_alpha(p_overlaps_prime, deltas_prime, ngridpts=ngridpts)
+        res_mat.append([u, alphas[0], alphas[1], alphas[2], len(co_mat_calls)])
+    res_mat_df = pd.DataFrame(
+        res_mat,
+        columns=[
+            "uid",
+            "lower_95_alpha_mat",
+            "mean_alpha_mat",
+            "upper_95_alpha_mat",
+            "nco_pass_mat",
+        ],
+    )
+
+    # Step 3: Inference for paternal crossovers ...
+    res_pat = []
+    for u, x in tqdm(zip(tuple_pat_df.uid, tuple_pat_df.co_list)):
+        co_pat_calls = [(c, s, e) for (c, s, e) in x if (e - s) < max_interval]
+        p_overlaps_prime = est_p_overlap(
+            co_pat_calls, co_hotspot_dict_male, nreps=nreps
+        )
+        deltas_prime = est_deltas(co_pat_calls, co_hotspot_dict_male)
+        alphas = est_mle_alpha(p_overlaps_prime, deltas_prime, ngridpts=ngridpts)
+        res_pat.append([u, alphas[0], alphas[1], alphas[2], len(co_mat_calls)])
+    res_pat_df = pd.DataFrame(
+        res_pat,
+        columns=[
+            "uid",
+            "lower_95_alpha_pat",
+            "mean_alpha_pat",
+            "upper_95_alpha_pat",
+            "nco_pass_pat",
+        ],
+    )

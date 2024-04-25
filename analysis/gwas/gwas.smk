@@ -192,13 +192,14 @@ rule create_sex_specific_hotspots:
         df = pd.read_csv(input.genmap, sep="\t", comment="#")
         df['SRR'] = df.cMperMb / df.cMperMb.mean()
         filt_df = df[df.SRR > params.srr]
+        filt_df.rename(columns={"Chr": "chrom", "Begin": "start", "End": "end"}, inplace=True)
         filt_df.to_csv(output.hotspots, index=None, sep="\t")
 
 rule create_hotspot_phenotypes:
     """Create phenotypes for hotspot occupancy."""
     input:
         co_data = config["crossovers"],
-        pratto2014 = lambda wildcards: config["bed_files"]["pratto2014"],
+        pratto_hotspots = lambda wildcards: config["bed_files"]["pratto2014"],
         male_hotspots = "results/phenotypes/appendix/{project_name}.Male.hotspots.tsv", 
         female_hotspots = "results/phenotypes/appendix/{project_name}.Female.hotspots.tsv" 
     output:
@@ -206,6 +207,10 @@ rule create_hotspot_phenotypes:
     resources:
         time="2:00:00",
         mem_mb="5G"
+    params:
+        max_interval = 50e3,
+        nreps = 100,
+        ngridpts = 300
     script:
         "scripts/hotspot_inference.py"
 
