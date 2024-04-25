@@ -175,11 +175,32 @@ rule create_rec_abundance_phenotypes:
     script:
         "scripts/create_rec_abundance_phenotypes.py"
 
+rule create_sex_specific_hotspots:
+    """Create sex-specific hotspot files from Haldorsson et al 2019."""
+    input:
+        genmap = lambda wildcards:  config["hotspots"][wildcards.sex]
+    output:
+        hotspots = "results/phenotypes/appendix/{project_name}.{sex}.hotspots.tsv"
+    wildcard_constraints:
+        sex="Male|Female"
+    params:
+        srr =  10
+    resources:
+        time="0:10:00",
+        mem_mb="4G"
+    run:
+        df = pd.read_csv(input.genmap, sep="\t", comment="#")
+        df['SRR'] = df.cMperMb / df.cMperMb.mean()
+        filt_df = df[df.SRR > params.srr]
+        filt_df.to_csv(output.hotspots, index=None, sep="\t")
+
 rule create_hotspot_phenotypes:
     """Create phenotypes for hotspot occupancy."""
     input:
         co_data = config["crossovers"],
-        hotspots = lambda wildcards: config["bed_files"]["hotspots"][wildcards.hotspots]
+        pratto2014 = lambda wildcards: config["bed_files"]["pratto2014"],
+        male_hotspots = "results/phenotypes/appendix/{project_name}.Male.hotspots.tsv", 
+        female_hotspots = "results/phenotypes/appendix/{project_name}.Female.hotspots.tsv" 
     output:
         hotspot_pheno = "results/phenotypes/{project_name}.hotspot_pheno.tsv"
     resources:
@@ -187,7 +208,6 @@ rule create_hotspot_phenotypes:
         mem_mb="5G"
     script:
         "scripts/hotspot_inference.py"
-
 
 rule create_rec_location_phenotypes:
     """Create the full quantitative phenotype."""
