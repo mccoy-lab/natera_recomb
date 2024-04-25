@@ -254,6 +254,8 @@ rule combine_phenotypes:
     resources:
         time="0:30:00",
         mem_mb="1G",
+    wildcard_constraints:
+        format="plink2|regenie",
     params:
         plink_format=lambda wildcards: wildcards.format == "plink2",
     run:
