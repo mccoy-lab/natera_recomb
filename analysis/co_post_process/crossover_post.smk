@@ -17,10 +17,9 @@ chroms = [f"chr{i}" for i in range(1, 23)]
 rule all:
     input:
         expand(
-            "results/{name}.crossover_filt.{recmap}.{ploid}_only.meta.tsv.gz",
+            "results/{name}.crossover_filt.{recmap}.merged.meta.tsv.gz",
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
-            ploid=["euploid", "aneuploid"],
         ),
 
 
@@ -125,6 +124,21 @@ rule intersect_w_metadata:
         )
         merged_meta_valid_co_df = co_df.merge(meta_mother_df, how="left")
         merged_meta_valid_co_df.to_csv(output.co_meta_map_tsv, index=None, sep="\t")
+
+
+rule merge_euploid_aneuploid:
+    input:
+        euploid_tsv="results/{name}.crossover_filt.{recmap}.euploid_only.meta.tsv.gz",
+        aneuploid_tsv="results/{name}.crossover_filt.{recmap}.aneuploid_only.meta.tsv.gz",
+    output:
+        merged_tsv="results/{name}.crossover_filt.{recmap}.merged.meta.tsv.gz",
+    run:
+        euploid_df = pd.read_csv(input.euploid_tsv, sep="\t")
+        aneuploid_df = pd.read_csv(input.aneuploid_tsv, sep="\t")
+        euploid_df["aneuploid"] = False
+        aneuploid_df["aneuploid"] = True
+        merged_df = pd.concat([euploid_df, aneuploid_df])
+        merged_df.to_csv(output.merged_tsv, sep="\t", index=None)
 
 
 # ------- Analysis 1b. Estimate Crossover Interference Stratified by Age & Sex -------- #

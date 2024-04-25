@@ -208,7 +208,7 @@ rule create_hotspot_phenotypes:
     """Create phenotypes for hotspot occupancy."""
     input:
         co_data=config["crossovers"],
-        # pratto_hotspots = lambda wildcards: config["bed_files"]["pratto2014"],
+        pratto_hotspots=lambda wildcards: config["bed_files"]["pratto2014"],
         male_hotspots="results/phenotypes/appendix/{project_name}.Male.hotspots.tsv",
         female_hotspots="results/phenotypes/appendix/{project_name}.Female.hotspots.tsv",
     output:
@@ -223,7 +223,7 @@ rule create_hotspot_phenotypes:
         ngridpts=300,
         plink_format=lambda wildcards: wildcards.format == "plink2",
     script:
-        "scripts/hotspot_inference.py"
+        "scripts/create_hotspot_phenotypes.py"
 
 
 rule create_rec_location_phenotypes:

@@ -81,7 +81,6 @@ def est_deltas(rs, co_int_dict):
     NOTE: here the value for `rs` is the actual realized set of crossovers.
 
     """
-    assert len(rs) > 0
     deltas = np.zeros(len(rs), dtype=int)
     for i, (chrom, start, end) in enumerate(rs):
         x = co_int_dict[chrom].overlap(start, end)
@@ -156,7 +155,10 @@ if __name__ == "__main__":
         )
         deltas_prime = est_deltas(co_mat_calls, co_hotspot_dict_female)
         alphas = est_mle_alpha(p_overlaps_prime, deltas_prime, ngridpts=ngridpts)
-        res_mat.append([u, alphas[0], alphas[1], alphas[2], len(co_mat_calls)])
+        if len(co_mat_calls) > 0:
+            res_mat.append([u, alphas[0], alphas[1], alphas[2], len(co_mat_calls)])
+        else:
+            res_mat.append([u, np.nan, np.nan, np.nan, len(co_mat_calls)])
     res_mat_df = pd.DataFrame(
         res_mat,
         columns=[
@@ -177,7 +179,10 @@ if __name__ == "__main__":
         )
         deltas_prime = est_deltas(co_pat_calls, co_hotspot_dict_male)
         alphas = est_mle_alpha(p_overlaps_prime, deltas_prime, ngridpts=ngridpts)
-        res_pat.append([u, alphas[0], alphas[1], alphas[2], len(co_mat_calls)])
+        if len(co_pat_calls) > 0:
+            res_pat.append([u, alphas[0], alphas[1], alphas[2], len(co_pat_calls)])
+        else:
+            res_pat.append([u, np.nan, np.nan, np.nan, len(co_pat_calls)])
     res_pat_df = pd.DataFrame(
         res_pat,
         columns=[
@@ -204,7 +209,7 @@ if __name__ == "__main__":
         .reset_index()[["father", "father", "mean_alpha_pat"]]
     )
     final_pat_df.columns = ["FID", "IID", "HotspotOccupancy"]
-    merged_df = pd.concat(final_mat_df, final_pat_df)
+    merged_df = pd.concat([final_mat_df, final_pat_df])
     if snakemake.params["plink_format"]:
         merged_df.rename(columns={"FID": "#FID"})
     merged_df.to_csv(snakemake.output["pheno"], sep="\t", index=None)

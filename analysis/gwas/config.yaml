@@ -1,10 +1,10 @@
 project_name: "natera_recombination_gwas"
 metadata: "../../data/spectrum_metadata_merged.csv"
-crossovers: "../../sandbox/crossovers.euploid_only.061123.v5.tsv.gz"
+crossovers: "../co_post_process/results/v30b_heuristic_90_nsib.crossover_filt.euploid_only.tsv.gz"
 recomb_map: "../../data/genmaps/halldorsson19/aau1043_datas3.gz"
 hotspots:
     Male: "../../data/genmaps/halldorsson19/aau1043_datas1.gz"
-    Female: "../../data/genmaps/halldorsson19/aau1043_datas1.gz"
+    Female: "../../data/genmaps/halldorsson19/aau1043_datas2.gz"
 bed_files:
     centromeres: "../../data/gaps/centromeres_grch38.bed"
     telomeres: "../../data/gaps/telomeres_grch38.bed"
