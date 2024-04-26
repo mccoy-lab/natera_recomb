@@ -155,9 +155,8 @@ rule estimate_chrom_specific_aneuploidy_effect:
         var_per_chrom_effects="results/statistical_models/{name}.{recmap}.aneuploidy_effect_per_chrom.var.tsv",
     shell:
         """
-        Rscript scripts/aneuploidy_effect_per_chrom.R {input.merged_tsv} {output.mean_per_chrom_effects} {output.var_per_chrom_effects}
+        Rscript --vanilla scripts/aneuploidy_effect_per_chrom.R {input.merged_tsv} {output.mean_per_chrom_effects} {output.var_per_chrom_effects}
         """
-
 
 # ------- Analysis 2. Estimate Crossover Interference Stratified by Age & Sex -------- #
 rule age_sex_stratified_co_interference:

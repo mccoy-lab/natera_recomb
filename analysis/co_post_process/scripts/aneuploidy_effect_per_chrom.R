@@ -69,7 +69,7 @@ for (c in chroms){
   # Append the output to a resulting data frame (NOTE: we should have a test in here somewhere I think?)
   per_chrom_var_effect_df = rbind(per_chrom_var_effect_df, c(c, "maternal", eu_var_mat$t0, sd(eu_var_mat$t), nrow(mat_eu_df), aneu_var_mat$t0, sd(aneu_var_mat$t0), nrow(mat_aneu_df)))
   per_chrom_var_effect_df = rbind(per_chrom_var_effect_df, c(c, "paternal", eu_var_pat$t0, sd(eu_var_pat$t), nrow(pat_eu_df), aneu_var_pat$t0, sd(aneu_var_pat$t0), nrow(pat_aneu_df)))
-
+  cat("Finished", c, "\n")
 }
 
 # Write out the fields here to be used ... 
