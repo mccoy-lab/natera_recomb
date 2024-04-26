@@ -140,8 +140,20 @@ rule merge_euploid_aneuploid:
         merged_df = pd.concat([euploid_df, aneuploid_df])
         merged_df.to_csv(output.merged_tsv, sep="\t", index=None)
 
+rule estimate_chrom_specific_aneuploidy_effect:
+    """Estimate the effects of multiple linear models."""
+    input:
+        merged_tsv="results/{name}.crossover_filt.{recmap}.merged.meta.tsv.gz",
+    output:
+        mean_per_chrom_effects = "results/statistical_models/aneuploidy_effect_per_chrom.mean.tsv",
+        var_per_chrom_effects = "results/statistical_models/aneuploidy_effect_per_chrom.var.tsv"
+    shell:
+        """
+        Rscript scripts/aneuploidy_effect_per_chrom.R {input.merged_tsv}
+        """
 
-# ------- Analysis 1b. Estimate Crossover Interference Stratified by Age & Sex -------- #
+
+# ------- Analysis 2. Estimate Crossover Interference Stratified by Age & Sex -------- #
 rule age_sex_stratified_co_interference:
     input:
         co_meta_map_tsv="results/{name}.crossover_filt.{recmap}.{ploid}_only.meta.tsv.gz",
@@ -156,10 +168,10 @@ rule age_sex_stratified_co_interference:
         "scripts/est_age_strat_xo.py"
 
 
-# ------- Analysis 2. Posterior estimates of CO-interference across individuals. ------- #
+# ------- Analysis 3. Posterior estimates of CO-interference across individuals. ------- #
 
 
-# ------- Analysis 3. Estimation of sex-specific recombination maps from crossover data ------ #
+# ------- Analysis 4. Estimation of sex-specific recombination maps from crossover data ------ #
 rule split_sex_specific_co_data:
     """Splits crossovers into maternal/paternal events."""
     input:
