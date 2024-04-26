@@ -21,6 +21,11 @@ rule all:
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
         ),
+        expand(
+            "results/statistical_models/{name}.{recmap}.aneuploidy_effect_per_chrom.mean.tsv",
+            name=config["crossover_data"].keys(),
+            recmap=config["recomb_maps"].keys(),
+        ),
 
 
 # expand(
@@ -140,16 +145,17 @@ rule merge_euploid_aneuploid:
         merged_df = pd.concat([euploid_df, aneuploid_df])
         merged_df.to_csv(output.merged_tsv, sep="\t", index=None)
 
+
 rule estimate_chrom_specific_aneuploidy_effect:
     """Estimate the effects of multiple linear models."""
     input:
         merged_tsv="results/{name}.crossover_filt.{recmap}.merged.meta.tsv.gz",
     output:
-        mean_per_chrom_effects = "results/statistical_models/aneuploidy_effect_per_chrom.mean.tsv",
-        var_per_chrom_effects = "results/statistical_models/aneuploidy_effect_per_chrom.var.tsv"
+        mean_per_chrom_effects="results/statistical_models/{name}.{recmap}.aneuploidy_effect_per_chrom.mean.tsv",
+        var_per_chrom_effects="results/statistical_models/{name}.{recmap}.aneuploidy_effect_per_chrom.var.tsv",
     shell:
         """
-        Rscript scripts/aneuploidy_effect_per_chrom.R {input.merged_tsv}
+        Rscript scripts/aneuploidy_effect_per_chrom.R {input.merged_tsv} {output.mean_per_chrom_effects} {output.var_per_chrom_effects}
         """
 
 
