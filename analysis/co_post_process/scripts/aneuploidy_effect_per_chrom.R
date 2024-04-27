@@ -73,8 +73,8 @@ for (c in chroms){
 }
 
 # Write out the fields here to be used ... 
-data.table::fwrite(per_chrom_mean_effect_df, file=arg[2], sep="\t")
+data.table::fwrite(per_chrom_mean_effect_df, file=args[2], sep="\t")
 
 colnames(per_chrom_var_effect_df) <- c("chrom", "sex", "var_co_eu", "sd_var_co_eu", "n_aneu", "var_co_aneu", "sd_var_co_aneu", "n_aneu")
-data.table::fwrite(per_chrom_var_effect_df, file=arg[3], sep="\t")
+data.table::fwrite(per_chrom_var_effect_df, file=args[3], sep="\t")
 

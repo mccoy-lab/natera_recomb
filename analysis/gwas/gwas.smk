@@ -15,11 +15,11 @@ configfile: "config.yaml"
 
 # Create the VCF data dictionary for each chromosome ...
 vcf_dict = {}
-chroms = [f"chr{i}" for i in range(20, 23)]
+chroms = [f"chr{i}" for i in range(1, 23)]
 for chrom in chroms:
     vcf_dict[
         chrom
-    ] = f"{config['datadir']}spectrum_imputed_{chrom}_rehead_filter.vcf.gz"
+    ] = f"{config['datadir']}spectrum_imputed_{chrom}_rehead_filter_cpra.vcf.gz"
 
 
 # ------- Rules Section ------- #
@@ -36,15 +36,24 @@ rule all:
         # pheno=["MeanCO", "VarCO", "RandPheno"],
         # format="regenie",
         # ),
-        # expand(
-        # "results/gwas_output/plink2/{project_name}_{sex}_{format}.{pheno}.glm.linear",
-        # format="plink2",
-        # project_name=config["project_name"],
-        # sex=["Male", "Female"],
-        # pheno=["MeanCO", "VarCO", "RandPheno"],
-        # ),
         expand(
-            "results/phenotypes/{project_name}.{format}.hotspot.pheno",
+            "results/gwas_output/plink2/{project_name}_{sex}_{format}.{pheno}.glm.linear",
+            format="plink2",
+            project_name=config["project_name"],
+            sex=["Male", "Female"],
+            pheno=["MeanCO", "VarCO", "RandPheno"],
+        ),
+        expand(
+            "results/phenotypes/{project_name}.{format}.pheno",
+            project_name=config["project_name"],
+            format="plink2",
+        ),
+        expand(
+            "results/pgen_input/{project_name}.pgen",
+            project_name=config["project_name"],
+        ),
+        expand(
+            "results/covariates/{project_name}.covars.{format}.txt",
             project_name=config["project_name"],
             format="plink2",
         ),
@@ -64,12 +73,12 @@ rule vcf2pgen:
         project_name=config["project_name"],
     resources:
         time="1:00:00",
-        mem_mb="8G",
-    threads: 24
+        mem_mb="10G",
+    threads: 12
     params:
         outfix=lambda wildcards: f"results/pgen_input/{wildcards.project_name}.{wildcards.chrom}",
     shell:
-        "plink2 --vcf {input.vcf_file} dosage=DS --double-id --maf 0.005 --threads {threads} --make-pgen --out {params.outfix} "
+        "plink2 --vcf {input.vcf_file} dosage=DS --double-id --maf 0.005 --memory 9000 --threads {threads} --make-pgen --out {params.outfix} "
 
 
 rule merge_full_pgen:
@@ -90,12 +99,12 @@ rule merge_full_pgen:
         outfix=lambda wildcards: f"results/pgen_input/{wildcards['project_name']}",
     resources:
         time="1:00:00",
-        mem_mb="5G",
-    threads: 24
+        mem_mb="12G",
+    threads: 12
     shell:
         """
         for i in {chroms}; do echo \"results/pgen_input/{wildcards.project_name}.$i\" ; done > {output.tmp_merge_file}
-        plink2 --pmerge-list {output.tmp_merge_file} --maf 0.005 --threads {threads} --make-pgen --out {params.outfix}
+        plink2 --pmerge-list {output.tmp_merge_file} --maf 0.005 --threads {threads} --memory 10000 --make-pgen --out {params.outfix}
         """
 
 
@@ -114,7 +123,7 @@ rule compute_pcs:
     resources:
         time="1:00:00",
         mem_mb="10G",
-    threads: 24
+    threads: 12
     params:
         npcs=20,
         outfix=lambda wildcards: f"results/covariates/{wildcards['project_name']}",
@@ -136,7 +145,7 @@ rule king_related_individuals:
         king_excludes="results/covariates/{project_name}.king.cutoff.out.id",
     resources:
         time="1:00:00",
-        mem_mb="1G",
+        mem_mb="10G",
     threads: 20
     params:
         outfix=lambda wildcards: f"results/covariates/{wildcards['project_name']}",
@@ -261,11 +270,17 @@ rule combine_phenotypes:
     run:
         abundance_df = pd.read_csv(input.abundance_pheno, sep="\t")
         location_df = pd.read_csv(input.location_pheno, sep="\t")
-        hotspot_df = pd.read_csv(input.hotspot_pheno)
-        pheno_df = abundance_df.merge(location_df, on=["IID"], how="outer").merge(
-            hotspot_df, on=["IID"], how="outer"
-        )
-        pheno_df.to_csv(output.pheno, sep="\t", index=None)
+        hotspot_df = pd.read_csv(input.hotspot_pheno, sep="\t")
+        if params.plink_format:
+            merge1_df = abundance_df.merge(location_df, on=["#FID", "IID"], how="outer")
+            pheno_df = merge1_df.merge(hotspot_df, on=["#FID", "IID"], how="outer")
+            pheno_df.drop_duplicates(inplace=True)
+            pheno_df.to_csv(output.pheno, sep="\t", na_rep="NA", index=None)
+        else:
+            merge1_df = abundance_df.merge(location_df, on=["FID", "IID"], how="outer")
+            pheno_df = merge1_df.merge(hotspot_df, on=["FID", "IID"], how="outer")
+            pheno_df.drop_duplicates(inplace=True)
+            pheno_df.to_csv(output.pheno, sep="\t", na_rep="NA", index=None)
 
 
 # ------ 3. Run GWAS using REGENIE across phenotypes ------ #

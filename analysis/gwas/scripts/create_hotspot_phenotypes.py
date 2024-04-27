@@ -211,6 +211,6 @@ if __name__ == "__main__":
     final_pat_df.columns = ["FID", "IID", "HotspotOccupancy"]
     merged_df = pd.concat([final_mat_df, final_pat_df])
     if snakemake.params["plink_format"]:
-        merged_df.rename(columns={"FID": "#FID"})
+        merged_df.rename(columns={"FID": "#FID"}, inplace=True)
     merged_df.to_csv(snakemake.output["pheno"], sep="\t", index=None)
     raw_df.to_csv(snakemake.output["pheno_raw"], sep="\t", index=None)

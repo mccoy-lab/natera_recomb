@@ -34,7 +34,7 @@ def avg_dist_centromere(df, centromere_df):
         centromere_dists[i] = centromere_dist(
             chrom, pos, centromere_dict=centromere_dict
         )
-    df["centromere_dist"] = df
+    df["centromere_dist"] = centromere_dists
     filt_df = (
         df.groupby(["mother", "father", "child", "chrom", "crossover_sex"])
         .agg({"centromere_dist": np.min})
@@ -46,12 +46,12 @@ def avg_dist_centromere(df, centromere_df):
     mother_df = filt_df[filt_df.crossover_sex == "maternal"][
         ["mother", "mother", "centromere_dist"]
     ]
-    mother_df.columns = ["IID", "FID", "CentromereDist"]
+    mother_df.columns = ["FID", "IID", "CentromereDist"]
     father_df = filt_df[filt_df.crossover_sex == "paternal"][
         ["father", "father", "centromere_dist"]
     ]
-    father_df.columns = ["IID", "FID", "CentromereDist"]
-    tot_df = pd.concat(mother_df, father_df)
+    father_df.columns = ["FID", "IID", "CentromereDist"]
+    tot_df = pd.concat([mother_df, father_df])
     return tot_df
 
 
@@ -69,7 +69,7 @@ def avg_dist_telomere(df, telomere_df):
     telomere_dists = np.zeros(df.shape[0])
     for i, (chrom, pos) in tqdm(enumerate(zip(df.chrom.values, df.avg_pos.values))):
         telomere_dists[i] = telomere_dist(chrom, pos, telomere_dict=telomere_dict)
-    df["telomere_dist"] = df
+    df["telomere_dist"] = telomere_dists
     filt_df = (
         df.groupby(["mother", "father", "child", "chrom", "crossover_sex"])
         .agg({"telomere_dist": np.min})
@@ -81,23 +81,25 @@ def avg_dist_telomere(df, telomere_df):
     mother_df = filt_df[filt_df.crossover_sex == "maternal"][
         ["mother", "mother", "telomere_dist"]
     ]
-    mother_df.columns = ["IID", "FID", "TelomereDist"]
+    mother_df.columns = ["FID", "IID", "TelomereDist"]
     father_df = filt_df[filt_df.crossover_sex == "paternal"][
         ["father", "father", "telomere_dist"]
     ]
-    father_df.columns = ["IID", "FID", "TelomereDist"]
-    tot_df = pd.concat(mother_df, father_df)
+    father_df.columns = ["FID", "IID", "TelomereDist"]
+    tot_df = pd.concat([mother_df, father_df])
     return tot_df
 
 
 if __name__ == "__main__":
     """Create several location-based phenotypes for analysis of recombination."""
     co_df = pd.read_csv(snakemake.input["co_data"], sep="\t")
-    centromere_df = pd.read_csv(snakemake.input["centromeres"], sep="\t")
-    telomere_df = pd.read_csv(snakemake.input["telomeres"], sep="\t")
-    mean_R_df = mean_var_co_per_genome(co_df)
-    rand_df = random_pheno(co_df)
-    merged_df = mean_R_df.merge(rand_df)
+    centromere_df = pd.read_csv(snakemake.input["centromeres"], header=None, sep="\t")
+    centromere_df.columns = ["chrom", "start", "end", "feature"]
+    telomere_df = pd.read_csv(snakemake.input["telomeres"], header=None, sep="\t")
+    telomere_df.columns = ["chrom", "start", "end", "feature"]
+    centromere_pheno_df = avg_dist_centromere(co_df, centromere_df)
+    telomere_pheno_df = avg_dist_telomere(co_df, telomere_df)
+    merged_df = centromere_pheno_df.merge(telomere_pheno_df, on=["FID", "IID"])
     if snakemake.params["plink_format"]:
-        merged_df.rename(columns={"FID": "#FID"})
+        merged_df.rename(columns={"FID": "#FID"}, inplace=True)
     merged_df.to_csv(snakemake.output["pheno"], sep="\t", index=None)
