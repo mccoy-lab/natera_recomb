@@ -274,12 +274,12 @@ rule combine_phenotypes:
         if params.plink_format:
             merge1_df = abundance_df.merge(location_df, on=["#FID", "IID"], how="outer")
             pheno_df = merge1_df.merge(hotspot_df, on=["#FID", "IID"], how="outer")
-            pheno_df.drop_duplicates(inplace=True)
+            pheno_df.drop_duplicates(subset=["IID"], inplace=True)
             pheno_df.to_csv(output.pheno, sep="\t", na_rep="NA", index=None)
         else:
             merge1_df = abundance_df.merge(location_df, on=["FID", "IID"], how="outer")
             pheno_df = merge1_df.merge(hotspot_df, on=["FID", "IID"], how="outer")
-            pheno_df.drop_duplicates(inplace=True)
+            pheno_df.drop_duplicates(subset=["IID"], inplace=True)
             pheno_df.to_csv(output.pheno, sep="\t", na_rep="NA", index=None)
 
 
@@ -301,13 +301,13 @@ rule create_sex_exclude_file:
             exclude_sex_df = cov_df[cov_df.Sex == 0]
         else:
             exclude_sex_df = cov_df[cov_df.Sex == 1]
-        if ~params["plink_format"]:
+        if not params["plink_format"]:
             king_df.columns = ["FID", "IID"]
         concat_df = pd.concat([exclude_sex_df, king_df])
-        if ~params["plink_format"]:
-            out_df = concat_df[["FID", "IID"]].drop_duplicates()
+        if not params["plink_format"]:
+            out_df = concat_df[["FID", "IID"]].drop_duplicates(subset=["IID"])
         else:
-            out_df = concat_df[["#FID", "IID"]].drop_duplicates()
+            out_df = concat_df[["#FID", "IID"]].drop_duplicates(subset=["IID"])
         out_df.to_csv(output["sex_specific"], index=None, sep="\t")
 
 
@@ -350,12 +350,20 @@ rule regenie_step2:
     output:
         expand(
             "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}_{pheno}.regenie.gz",
-            pheno=["MeanCO", "VarCO", "RandPheno"],
+            pheno=[
+                "MeanCO",
+                "VarCO",
+                "cvCO",
+                "RandPheno",
+                "CentromereDist",
+                "TelomereDist",
+                "HotspotOccupancy",
+            ],
         ),
     resources:
         time="6:00:00",
         mem_mb="10G",
-    threads: 24
+    threads: 16
     wildcard_constraints:
         format="regenie",
     shell:
@@ -376,15 +384,23 @@ rule plink_regression:
     output:
         expand(
             "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}.{pheno}.glm.linear",
-            pheno=["MeanCO", "VarCO", "RandPheno"],
+            pheno=[
+                "MeanCO",
+                "VarCO",
+                "cvCO",
+                "RandPheno",
+                "CentromereDist",
+                "TelomereDist",
+                "HotspotOccupancy",
+            ],
         ),
     resources:
         time="6:00:00",
         mem_mb="10G",
-    threads: 24
+    threads: 16
     wildcard_constraints:
         format="plink2",
     params:
         outfix=lambda wildcards: f"results/gwas_output/{wildcards.format}/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}",
     shell:
-        "plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar}  --pheno {input.pheno} --covar {input.covar} --quantile-normalize --glm hide-covar --remove {input.sex_exclusion} --out {params.outfix}"
+        "plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar}  --pheno {input.pheno} --covar {input.covar} --threads {threads} --memory 9000 --quantile-normalize --glm hide-covar --remove {input.sex_exclusion} --out {params.outfix}"
