@@ -66,5 +66,5 @@ if __name__ == "__main__":
     rand_df = random_pheno(co_df)
     merged_df = mean_R_df.merge(rand_df)
     if snakemake.params["plink_format"]:
-        merged_df.rename(columns={"FID": "#FID"})
+        merged_df.rename(columns={"FID": "#FID"}, inplace=True)
     merged_df.to_csv(snakemake.output["pheno"], sep="\t", index=None)

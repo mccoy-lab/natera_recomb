@@ -40,7 +40,7 @@ if __name__ == "__main__":
     switch_err_rate = snakemake.params["phase_err"]
 
     # Run the phase_error checking
-    rs = [1e-2, 1e-4, 1e-8]
+    rs = [1e-4, 1e-8]
     for r in rs:
         phase_correct.viterbi_phase_correct(r=r)
         _, _, se_m, _, _, _ = phase_correct.estimate_switch_err_true()
@@ -63,43 +63,6 @@ if __name__ == "__main__":
                 r,
                 np.nan,
                 "Viterbi",
-                seed,
-            ]
-        )
-    lods = [-1.0, -2.0, -5.0]
-    for l in lods:
-        phase_correct.lod_phase_correct(
-            lod_thresh=l,
-            pi0=np.median(phase_correct.embryo_pi0s),
-            std_dev=np.median(phase_correct.embryo_sigmas),
-        )
-        # Phase correct the paternal haplotypes using median parameter inferred across all siblings
-        phase_correct.lod_phase_correct(
-            maternal=False,
-            lod_thresh=l,
-            pi0=np.median(phase_correct.embryo_pi0s),
-            std_dev=np.median(phase_correct.embryo_sigmas),
-        )
-        _, _, se_m, _, _, _ = phase_correct.estimate_switch_err_true()
-        _, _, se_mr, _, _, _ = phase_correct.estimate_switch_err_true(fixed=True)
-        _, _, se_p, _, _, _ = phase_correct.estimate_switch_err_true(maternal=False)
-        _, _, se_pr, _, _, _ = phase_correct.estimate_switch_err_true(
-            maternal=False, fixed=True
-        )
-        acc.append(
-            [
-                m,
-                nsibs,
-                std_dev,
-                mix_prop,
-                switch_err_rate,
-                se_m,
-                se_mr,
-                se_p,
-                se_pr,
-                np.nan,
-                l,
-                "LOD Score",
                 seed,
             ]
         )

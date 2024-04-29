@@ -1,6 +1,11 @@
 metadata: "../../data/spectrum_metadata_merged.csv"
 aneuploidy_data: "/data/rmccoy22/natera_spectrum/karyohmm_outputs/compiled_output/natera_embryos.karyohmm_v30a.bph_sph_trisomy.full_annotation.031624.tsv.gz"
 crossover_data: 
-    v30a: "../crossovers/results/test_crossover.karyohmm_v30a.040124.tsv.gz"
+    #v30a: "../crossovers/results/test_crossover.karyohmm_v30a.040124.tsv.gz"
+    #v30a_heuristic: "../crossovers/results/test_crossover_heuristic.v30b.batch1_of_4.tsv.gz"
+    #v30a_heuristic_v2: "../crossovers/results/test_crossover_heuristic.v30b.batch1_of_10.tsv.gz"
+    #v30b_heuristic_95: "../crossovers/results/test_crossover_heuristic.v30b.batch1_of_2.tsv.gz"
+    #v30b_heuristic_95_nsib: "../crossovers/results/test_crossover_heuristic.v30b.batch1_of_2.nsib_support.tsv.gz"
+    v30b_heuristic_90_nsib: "../crossovers/results/test_crossover_heuristic.v30b.nsib_support.tsv.gz"
 recomb_maps:
   deCode_haldorsson19: "../../data/genmaps/halldorsson19/aau1043_datas3.gz"

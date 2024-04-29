@@ -15,13 +15,11 @@ configfile: "config.yaml"
 
 # Create the VCF data dictionary for each chromosome ...
 vcf_dict = {}
-chroms = [f"chr{i}" for i in range(20, 23)]
+chroms = [f"chr{i}" for i in range(1, 23)]
 for chrom in chroms:
     vcf_dict[
         chrom
-    ] = f"{config['datadir']}spectrum_imputed_{chrom}_rehead_filter.vcf.gz"
-
-# f"/data/rmccoy22/natera_spectrum/genotypes/opticall_parents_031423/genotypes/eagle_phased_hg38/natera_parents.b38.chr{c}.vcf.gz"
+    ] = f"{config['datadir']}spectrum_imputed_{chrom}_rehead_filter_cpra.vcf.gz"
 
 
 # ------- Rules Section ------- #
@@ -31,19 +29,33 @@ localrules:
 
 rule all:
     input:
-        expand(
-            "results/gwas_output/regenie/{project_name}_{sex}_{format}_{pheno}.regenie.gz",
-            project_name=config["project_name"],
-            sex=["Male", "Female"],
-            pheno=["MeanCO", "VarCO", "RandPheno"],
-            format="regenie",
-        ),
+        #         expand(
+        # "results/gwas_output/regenie/{project_name}_{sex}_{format}_{pheno}.regenie.gz",
+        # project_name=config["project_name"],
+        # sex=["Male", "Female"],
+        # pheno=["MeanCO", "VarCO", "RandPheno"],
+        # format="regenie",
+        # ),
         expand(
             "results/gwas_output/plink2/{project_name}_{sex}_{format}.{pheno}.glm.linear",
             format="plink2",
             project_name=config["project_name"],
             sex=["Male", "Female"],
             pheno=["MeanCO", "VarCO", "RandPheno"],
+        ),
+        expand(
+            "results/phenotypes/{project_name}.{format}.pheno",
+            project_name=config["project_name"],
+            format="plink2",
+        ),
+        expand(
+            "results/pgen_input/{project_name}.pgen",
+            project_name=config["project_name"],
+        ),
+        expand(
+            "results/covariates/{project_name}.covars.{format}.txt",
+            project_name=config["project_name"],
+            format="plink2",
         ),
 
 
@@ -61,12 +73,12 @@ rule vcf2pgen:
         project_name=config["project_name"],
     resources:
         time="1:00:00",
-        mem_mb="8G",
-    threads: 24
+        mem_mb="10G",
+    threads: 12
     params:
         outfix=lambda wildcards: f"results/pgen_input/{wildcards.project_name}.{wildcards.chrom}",
     shell:
-        "plink2 --vcf {input.vcf_file} dosage=DS --double-id --maf 0.005 --threads {threads} --make-pgen --out {params.outfix} "
+        "plink2 --vcf {input.vcf_file} dosage=DS --double-id --maf 0.005 --memory 9000 --threads {threads} --make-pgen --out {params.outfix} "
 
 
 rule merge_full_pgen:
@@ -87,12 +99,12 @@ rule merge_full_pgen:
         outfix=lambda wildcards: f"results/pgen_input/{wildcards['project_name']}",
     resources:
         time="1:00:00",
-        mem_mb="5G",
-    threads: 24
+        mem_mb="12G",
+    threads: 12
     shell:
         """
         for i in {chroms}; do echo \"results/pgen_input/{wildcards.project_name}.$i\" ; done > {output.tmp_merge_file}
-        plink2 --pmerge-list {output.tmp_merge_file} --maf 0.005 --threads {threads} --make-pgen --out {params.outfix}
+        plink2 --pmerge-list {output.tmp_merge_file} --maf 0.005 --threads {threads} --memory 10000 --make-pgen --out {params.outfix}
         """
 
 
@@ -111,7 +123,7 @@ rule compute_pcs:
     resources:
         time="1:00:00",
         mem_mb="10G",
-    threads: 24
+    threads: 12
     params:
         npcs=20,
         outfix=lambda wildcards: f"results/covariates/{wildcards['project_name']}",
@@ -133,7 +145,7 @@ rule king_related_individuals:
         king_excludes="results/covariates/{project_name}.king.cutoff.out.id",
     resources:
         time="1:00:00",
-        mem_mb="1G",
+        mem_mb="10G",
     threads: 20
     params:
         outfix=lambda wildcards: f"results/covariates/{wildcards['project_name']}",
@@ -178,13 +190,57 @@ rule create_rec_abundance_phenotypes:
         "scripts/create_rec_abundance_phenotypes.py"
 
 
+rule create_sex_specific_hotspots:
+    """Create sex-specific hotspot files from Haldorsson et al 2019."""
+    input:
+        genmap=lambda wildcards: config["hotspots"][wildcards.sex],
+    output:
+        hotspots="results/phenotypes/appendix/{project_name}.{sex}.hotspots.tsv",
+    wildcard_constraints:
+        sex="Male|Female",
+    params:
+        srr=10,
+    resources:
+        time="0:10:00",
+        mem_mb="4G",
+    run:
+        df = pd.read_csv(input.genmap, sep="\t", comment="#")
+        df["SRR"] = df.cMperMb / df.cMperMb.mean()
+        filt_df = df[df.SRR > params.srr]
+        filt_df.rename(
+            columns={"Chr": "chrom", "Begin": "start", "End": "end"}, inplace=True
+        )
+        filt_df.to_csv(output.hotspots, index=None, sep="\t")
+
+
+rule create_hotspot_phenotypes:
+    """Create phenotypes for hotspot occupancy."""
+    input:
+        co_data=config["crossovers"],
+        pratto_hotspots=lambda wildcards: config["bed_files"]["pratto2014"],
+        male_hotspots="results/phenotypes/appendix/{project_name}.Male.hotspots.tsv",
+        female_hotspots="results/phenotypes/appendix/{project_name}.Female.hotspots.tsv",
+    output:
+        pheno="results/phenotypes/{project_name}.{format}.hotspot.pheno",
+        pheno_raw="results/phenotypes/{project_name}.{format}.hotspot.raw.pheno",
+    resources:
+        time="2:00:00",
+        mem_mb="5G",
+    params:
+        max_interval=50e3,
+        nreps=100,
+        ngridpts=300,
+        plink_format=lambda wildcards: wildcards.format == "plink2",
+    script:
+        "scripts/create_hotspot_phenotypes.py"
+
+
 rule create_rec_location_phenotypes:
     """Create the full quantitative phenotype."""
     input:
         co_data=config["crossovers"],
-        centromeres = config["bed_files"]["centromeres"]
-        telomeres = config["bed_files"]["telomeres"]
-        hotspots = config["bed_files"]["hotspots"]
+        centromeres=config["bed_files"]["centromeres"],
+        telomeres=config["bed_files"]["telomeres"],
     output:
         pheno="results/phenotypes/{project_name}.{format}.location.pheno",
     resources:
@@ -201,18 +257,30 @@ rule combine_phenotypes:
     input:
         abundance_pheno="results/phenotypes/{project_name}.{format}.abundance.pheno",
         location_pheno="results/phenotypes/{project_name}.{format}.location.pheno",
+        hotspot_pheno="results/phenotypes/{project_name}.{format}.hotspot.pheno",
     output:
         pheno="results/phenotypes/{project_name}.{format}.pheno",
     resources:
         time="0:30:00",
         mem_mb="1G",
+    wildcard_constraints:
+        format="plink2|regenie",
     params:
         plink_format=lambda wildcards: wildcards.format == "plink2",
     run:
         abundance_df = pd.read_csv(input.abundance_pheno, sep="\t")
         location_df = pd.read_csv(input.location_pheno, sep="\t")
-        pheno_df = abundance_df.merge(location_df)
-        pheno_df.to_csv(output.pheno, sep="\t", index=None)
+        hotspot_df = pd.read_csv(input.hotspot_pheno, sep="\t")
+        if params.plink_format:
+            merge1_df = abundance_df.merge(location_df, on=["#FID", "IID"], how="outer")
+            pheno_df = merge1_df.merge(hotspot_df, on=["#FID", "IID"], how="outer")
+            pheno_df.drop_duplicates(subset=["IID"], inplace=True)
+            pheno_df.to_csv(output.pheno, sep="\t", na_rep="NA", index=None)
+        else:
+            merge1_df = abundance_df.merge(location_df, on=["FID", "IID"], how="outer")
+            pheno_df = merge1_df.merge(hotspot_df, on=["FID", "IID"], how="outer")
+            pheno_df.drop_duplicates(subset=["IID"], inplace=True)
+            pheno_df.to_csv(output.pheno, sep="\t", na_rep="NA", index=None)
 
 
 # ------ 3. Run GWAS using REGENIE across phenotypes ------ #
@@ -233,13 +301,13 @@ rule create_sex_exclude_file:
             exclude_sex_df = cov_df[cov_df.Sex == 0]
         else:
             exclude_sex_df = cov_df[cov_df.Sex == 1]
-        if ~params["plink_format"]:
+        if not params["plink_format"]:
             king_df.columns = ["FID", "IID"]
         concat_df = pd.concat([exclude_sex_df, king_df])
-        if ~params["plink_format"]:
-            out_df = concat_df[["FID", "IID"]].drop_duplicates()
+        if not params["plink_format"]:
+            out_df = concat_df[["FID", "IID"]].drop_duplicates(subset=["IID"])
         else:
-            out_df = concat_df[["#FID", "IID"]].drop_duplicates()
+            out_df = concat_df[["#FID", "IID"]].drop_duplicates(subset=["IID"])
         out_df.to_csv(output["sex_specific"], index=None, sep="\t")
 
 
@@ -282,12 +350,20 @@ rule regenie_step2:
     output:
         expand(
             "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}_{pheno}.regenie.gz",
-            pheno=["MeanCO", "VarCO", "RandPheno"],
+            pheno=[
+                "MeanCO",
+                "VarCO",
+                "cvCO",
+                "RandPheno",
+                "CentromereDist",
+                "TelomereDist",
+                "HotspotOccupancy",
+            ],
         ),
     resources:
         time="6:00:00",
         mem_mb="10G",
-    threads: 24
+    threads: 16
     wildcard_constraints:
         format="regenie",
     shell:
@@ -308,15 +384,23 @@ rule plink_regression:
     output:
         expand(
             "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}.{pheno}.glm.linear",
-            pheno=["MeanCO", "VarCO", "RandPheno"],
+            pheno=[
+                "MeanCO",
+                "VarCO",
+                "cvCO",
+                "RandPheno",
+                "CentromereDist",
+                "TelomereDist",
+                "HotspotOccupancy",
+            ],
         ),
     resources:
         time="6:00:00",
         mem_mb="10G",
-    threads: 24
+    threads: 16
     wildcard_constraints:
         format="plink2",
     params:
         outfix=lambda wildcards: f"results/gwas_output/{wildcards.format}/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}",
     shell:
-        "plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar}  --pheno {input.pheno} --covar {input.covar} --quantile-normalize --glm hide-covar --remove {input.sex_exclusion} --out {params.outfix}"
+        "plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar}  --pheno {input.pheno} --covar {input.covar} --threads {threads} --memory 9000 --quantile-normalize --glm hide-covar --remove {input.sex_exclusion} --out {params.outfix}"
