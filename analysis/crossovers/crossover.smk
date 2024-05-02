@@ -86,6 +86,7 @@ def create_trios(
 est_params = False
 total_params = []
 total_data = []
+total_trisomy_data = []
 if Path("results/natera_inference/valid_trios.triplets.txt").is_file():
     with open("results/natera_inference/valid_trios.triplets.txt", "r") as fp:
         for i, line in enumerate(fp):
@@ -97,6 +98,14 @@ if Path("results/natera_inference/valid_trios.triplets.txt").is_file():
                 total_params.append(f"results/natera_inference/{m}+{f}.est_params.tsv")
         total_params = np.unique(total_params).tolist()
         total_data = np.unique(total_data).tolist()
+
+if Path("results/natera_inference_trisomy/valid_trisomies.txt").is_file():
+    with open("results/natera_inference_trisomy/valid_trisomies.txt", "r") as fp:
+        for line in fp:
+            [m, f, c, chrom] = line.rstrip().split()
+            total_trisomy_data.append(
+                f"results/natera_inference_trisomy/{m}+{f}+{c}.{chrom}.est_recomb_trisomy.tsv"
+            )
 
 
 # ------- Rules Section ------- #
@@ -112,8 +121,23 @@ rule all:
     input:
         "results/natera_inference/valid_trios.triplets.txt",
         "results/natera_inference/valid_trios.triplets.euploid.txt",
+        "results/natera_inference_trisomy/valid_trisomies.txt",
         total_data,
-        total_params,
+        total_trisomy_data,
+
+
+rule euploid_chrom_co:
+    """Run the crossover calling on the euploid chromosomes."""
+    input:
+        "results/natera_inference/valid_trios.triplets.txt",
+        total_data,
+
+
+rule trisomic_chrom_co:
+    """Run the crossover calling on trisomic chromosomes."""
+    input:
+        "results/natera_inference_trisomy/valid_trisomies.txt",
+        total_trisomy_data,
 
 
 rule generate_parent_sample_list:
@@ -207,28 +231,6 @@ rule est_params_euploid_chrom_trio:
         "scripts/est_params_sibling_euploid.py"
 
 
-rule est_crossover_euploid_chrom_trio:
-    """Estimate crossover events for euploid chromosomes in trio datasets."""
-    input:
-        triplets="results/natera_inference/valid_trios.triplets.txt",
-        baf_pkl=lambda wildcards: define_triplets(
-            mother_id=wildcards.mother, father_id=wildcards.father
-        ),
-        aneuploidy_calls=aneuploidy_calls,
-    output:
-        est_recomb="results/natera_inference/{mother}+{father}.est_recomb.tsv",
-        recomb_paths="results/natera_inference/{mother}+{father}.recomb_paths.pkl.gz",
-    params:
-        chroms=chroms,
-        use_prev_params=True,
-        ppThresh=0.90,
-    resources:
-        time="2:00:00",
-        mem_mb="10G",
-    script:
-        "scripts/sibling_hmm.py"
-
-
 rule est_crossover_euploid_chrom_trio_heuristic:
     """Estimate crossover events for euploid chromosomes in trio datasets using the heuristic approach of Coop et al 2007."""
     input:
@@ -249,3 +251,34 @@ rule est_crossover_euploid_chrom_trio_heuristic:
         mem_mb="10G",
     script:
         "scripts/sibling_rec_est.py"
+
+
+# --------- Identifying crossovers in trisomies -------- #
+rule isolate_trisomies:
+    """Isolate potential trisomies that we should test using the """
+    input:
+        aneuploidy_calls=aneuploidy_calls,
+    output:
+        trisomy_calls="results/natera_inference_trisomy/valid_trisomies.tsv",
+    params:
+        ppThresh=0.90,
+    run:
+        aneu_df = pd.read_csv(input.aneuploidy_calls, sep="\t")
+        trisomy_df = aneu_df[
+            (aneu_df["post_max"] > params["ppThresh"])
+            & (aneu_df["bf_max_cat"].isin(["3m", "3p"]))
+        ]
+        trisomy_df[["mother", "father", "child", "chrom", "bf_max_cat"]].to_csv(
+            snakemake.output["trisomy_calls"], index=None, sep="\t"
+        )
+
+
+rule est_crossover_trisomic_chrom_trio:
+    """Estimate crossovers using trisomy-specific path tracing."""
+    input:
+        trisomy_calls="results/natera_inference_trisomy/valid_trisomies.tsv",
+        baf_pkl=lambda wildcards: f"{base_path}/{wildcards.mother}+{wildcards.father}/{wildcards.child}.bafs.pkl.gz",
+    output:
+        "results/natera_inference_trisomy/{mother}+{father}+{child}.{chrom}.est_recomb_trisomy.tsv",
+    script:
+        "scripts/sibling_co_trisomy.py"
