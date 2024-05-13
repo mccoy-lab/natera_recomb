@@ -29,19 +29,20 @@ localrules:
 
 rule all:
     input:
-        #         expand(
-        # "results/gwas_output/regenie/{project_name}_{sex}_{format}_{pheno}.regenie.gz",
-        # project_name=config["project_name"],
-        # sex=["Male", "Female"],
-        # pheno=["MeanCO", "VarCO", "RandPheno"],
-        # format="regenie",
-        # ),
         expand(
-            "results/gwas_output/plink2/{project_name}_{sex}_{format}.{pheno}.glm.linear",
+            "results/gwas_output/plink2/clumped/{project_name}_{sex}_{format}.{pheno}.clumps",
             format="plink2",
             project_name=config["project_name"],
             sex=["Male", "Female"],
-            pheno=["MeanCO", "VarCO", "RandPheno"],
+            pheno=[
+                "MeanCO",
+                "VarCO",
+                "cvCO",
+                "RandPheno",
+                "CentromereDist",
+                "TelomereDist",
+                "HotspotOccupancy",
+            ],
         ),
         expand(
             "results/phenotypes/{project_name}.{format}.pheno",
@@ -404,3 +405,25 @@ rule plink_regression:
         outfix=lambda wildcards: f"results/gwas_output/{wildcards.format}/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}",
     shell:
         "plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar}  --pheno {input.pheno} --covar {input.covar} --threads {threads} --memory 9000 --quantile-normalize --glm hide-covar --remove {input.sex_exclusion} --out {params.outfix}"
+
+
+rule plink_clumping:
+    input:
+        pgen="results/pgen_input/{project_name}.pgen",
+        psam="results/pgen_input/{project_name}.psam",
+        pvar="results/pgen_input/{project_name}.pvar",
+        sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
+        gwas_results="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
+    output:
+        "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.clumps",
+    resources:
+        time="1:00:00",
+        mem_mb="10G",
+    threads: 8
+    wildcard_constraints:
+        format="plink2",
+    params:
+        outfix=lambda wildcards: f"results/gwas_output/{wildcards.format}/clumped/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}.{wildcards.pheno}",
+        pval=1e-6,
+    shell:
+        "plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --threads {threads} --clump-unphased --clump {input.gwas_results} --remove {input.sex_exclusion} --clump-p1 {params.pval} --out {params.outfix}"
