@@ -54,7 +54,7 @@ rule filter_co_dataset:
         import pandas as pd
 
         co_df = pd.read_csv(input.crossover_data, sep="\t")
-        co_df["uid"] = co_df["mother"] + co_df["father"] + co_df["child"]
+        co_df["uid"] = co_df['mother'].str.cat(co_df[['father', 'child']], sep='+')
         co_df["valid_co"] = ~co_df.duplicated(
             ["uid", "chrom", "crossover_sex", "min_pos", "max_pos"], keep=False
         )

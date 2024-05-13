@@ -4,9 +4,7 @@ import pandas as pd
 if __name__ == "__main__":
     # Keep track at the chromosome -level the number of disomies able to be processed ...
     aneuploidy_df = pd.read_csv(snakemake.input["aneuploidy_tsv"], sep="\t")
-    aneuploidy_df["uid"] = (
-        aneuploidy_df["mother"] + aneuploidy_df["father"] + aneuploidy_df["child"]
-    )
+    aneuploidy_df["uid"] = aneuploidy_df['mother'].str.cat(aneuploidy_df[['father', 'child']], sep='+')
     aneuploidy_df["parents"] = aneuploidy_df["mother"] + aneuploidy_df["father"]
     aneuploidy_df["disomy"] = aneuploidy_df["2"] >= snakemake.params["ppThresh"]
 
