@@ -31,6 +31,11 @@ localrules:
 rule all:
     input:
         expand(
+            "results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv",
+            format="plink2",
+            project_name=config["project_name"],
+        ),
+        expand(
             "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.sumstats.tsv",
             format="plink2",
             project_name=config["project_name"],
@@ -44,34 +49,6 @@ rule all:
                 "TelomereDist",
                 "HotspotOccupancy",
             ],
-        ),
-        expand(
-            "results/phenotypes/{project_name}.{format}.pheno",
-            project_name=config["project_name"],
-            format="plink2",
-        ),
-        expand(
-            "results/pgen_input/{project_name}.pgen",
-            project_name=config["project_name"],
-        ),
-        expand(
-            "results/covariates/{project_name}.covars.{format}.txt",
-            project_name=config["project_name"],
-            format="plink2",
-        ),
-        expand(
-            "results/phenotypes/{project_name}.{format}.pheno",
-            project_name=config["project_name"],
-            format="plink2",
-        ),
-        expand(
-            "results/pgen_input/{project_name}.pgen",
-            project_name=config["project_name"],
-        ),
-        expand(
-            "results/covariates/{project_name}.covars.{format}.txt",
-            project_name=config["project_name"],
-            format="plink2",
         ),
 
 
@@ -510,27 +487,26 @@ rule combine_gwas_results:
             df = pd.read_csv(fp, header=None, sep="\t")
             df.columns = [
                 "CHROM",
-                    "POS",
-                    "ID",
-                    "P",
-                    "TOTAL",
-                    "NONSIG",
-                    "S0.05",
-                    "S0.01",
-                    "S0.001",
-                    "S0.0001",
-                    "SP2",
-                    "POS_A",
-                    "POS_B",
-                    "CHROM_X",
-                    "GeneStart",
-                    "GeneEnd",
-                    "Gencode",
-                    "Dist",
+                "POS",
+                "ID",
+                "P",
+                "TOTAL",
+                "NONSIG",
+                "S0.05",
+                "S0.01",
+                "S0.001",
+                "S0.0001",
+                "SP2",
+                "POS_A",
+                "POS_B",
+                "CHROM_X",
+                "GeneStart",
+                "GeneEnd",
+                "Gencode",
+                "Dist",
                 ]
-                df["PHENO"] = f"{pheno}_{sex}"
+            df["PHENO"] = f"{pheno}_{sex}"
             tot_dfs.append(df)
-            # Concatenate to create a final dataset
         final_df = pd.concat(tot_dfs)
         final_df = final_df[
             [
@@ -552,4 +528,4 @@ rule combine_gwas_results:
                 "Dist",
             ]
         ]
-        final_df.to_csv(snakemake.output["sumstats_final"], sep="\t", index=None)
+        final_df.to_csv(output.sumstats_final, sep="\t", index=None)
