@@ -421,8 +421,27 @@ rule plink_clumping:
         "plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --threads {threads} --clump-unphased --clump {input.gwas_results} --remove {input.sex_exclusion} --clump-p1 {params.pval} --out {params.outfix}"
 
 
-# ----------- Mapping variants to genes ----------- #
+rule obtain_effect_sizes:
+    """Obtain effect sizes for lead variants in a clump."""
+    input:
+        clumps = "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.clumps"
+        gwas_results="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
+    output:
+        header = temp("results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.header"),
+        temp_top_variants = temp("results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.tmp.top_vars"),
+        top_variants = "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.top_vars",
+    shell:
+        """
+        awk 'NR == 1 {print $0}' {input.gwas_results} | sed s'/#//g' > {output.header}
+        awk '{print $3}' {input.clumps} | while read line; do grep $line {input.gwas_results}; done > {output.temp_top_variants}
+        cat {output.header} {output.temp_top_variants} > {output.top_variants}
+        """
 
+# rule obtain_allele_frequencies:
+    # input:
+        
+
+# ----------- Mapping variants to genes ----------- #
 
 rule reformat_gencode_bed:
     input:
