@@ -282,3 +282,4 @@ rule est_crossover_trisomic_chrom_trio:
         "results/natera_inference_trisomy/{mother}+{father}+{child}.{chrom}.est_recomb_trisomy.tsv",
     script:
         "scripts/sibling_co_trisomy.py"
+

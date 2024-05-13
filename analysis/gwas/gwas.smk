@@ -58,6 +58,20 @@ rule all:
             project_name=config["project_name"],
             format="plink2",
         ),
+        expand(
+            "results/phenotypes/{project_name}.{format}.pheno",
+            project_name=config["project_name"],
+            format="plink2",
+        ),
+        expand(
+            "results/pgen_input/{project_name}.pgen",
+            project_name=config["project_name"],
+        ),
+        expand(
+            "results/covariates/{project_name}.covars.{format}.txt",
+            project_name=config["project_name"],
+            format="plink2",
+        ),
 
 
 # ------- 0. Preprocess Genetic data ------- #
