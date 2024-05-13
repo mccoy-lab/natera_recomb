@@ -7,6 +7,7 @@ import pickle, gzip
 from tqdm import tqdm
 from pathlib import Path
 from io import StringIO
+import re
 
 
 # ---- Parameters for inference in Natera Data ---- #
@@ -30,7 +31,7 @@ localrules:
 rule all:
     input:
         expand(
-            "results/gwas_output/plink2/clumped/{project_name}_{sex}_{format}.{pheno}.clumps",
+            "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.sumstats.tsv",
             format="plink2",
             project_name=config["project_name"],
             sex=["Male", "Female"],
@@ -441,3 +442,114 @@ rule plink_clumping:
         pval=1e-6,
     shell:
         "plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --threads {threads} --clump-unphased --clump {input.gwas_results} --remove {input.sex_exclusion} --clump-p1 {params.pval} --out {params.outfix}"
+
+
+# ----------- Mapping variants to genes ----------- #
+
+
+rule reformat_gencode_bed:
+    input:
+        gencode_annotation=config["gencode"],
+    output:
+        "results/resources/gencode.bed",
+    shell:
+        'zcat {input.gencode_annotation} | grep -v "^#" | awk \'$3 == "gene"\' | awk -F"\t" \'{{print $1"\t"$4"\t"$5"\t"$9}}\' | grep "protein" | bedtools sort > {output}'
+
+
+rule map_snp2gene:
+    """Mapping the lead SNP of a cluster to the nearest protein coding gene in gencode."""
+    input:
+        clump_results="results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.clumps",
+        gencode="results/resources/gencode.bed",
+    output:
+        clump_bed=temp(
+            "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.snp2gene.clump.bed"
+        ),
+        reformat_clumps=temp(
+            "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.snp2gene.clump.reform"
+        ),
+        snp2gene=temp(
+            "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.snp2gene"
+        ),
+        reform_sumstats="results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.sumstats.tsv",
+    shell:
+        """
+        awk '{{print $3}}' {input.clump_results} | grep -v \"ID\" |  awk -F \":\" \'{{print $1\"\t\"$2\"\t\"$2}}\' | bedtools sort > {output.clump_bed}
+        bedtools closest -a {output.clump_bed} -b {input.gencode} -k 1 -d > {output.snp2gene}
+        awk \'NR > 1 {{OFS=\"\t\"; $1=\"chr\"$1; print $0}}\' {input.clump_results} | sort -k1,2n > {output.reformat_clumps}
+        awk \'FNR==NR {{a[$1,$2]=$0; next}} {{print a[$1,$2],$0}}\' {output.reformat_clumps} {output.snp2gene} | sort -k4 -g > {output.reform_sumstats}
+        """
+
+
+rule combine_gwas_results:
+    """Combine GWAS results across """
+    input:
+        sumstats=expand(
+            "results/gwas_output/{{format}}/clumped/{{project_name}}_{sex}_{{format}}.{pheno}.sumstats.tsv",
+            pheno=[
+                "MeanCO",
+                "VarCO",
+                "cvCO",
+                "RandPheno",
+                "CentromereDist",
+                "TelomereDist",
+                "HotspotOccupancy",
+            ],
+            sex=["Male", "Female"],
+        ),
+    output:
+        sumstats_final="results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv",
+    run:
+        tot_dfs = []
+        for fp in input.sumstats:
+            x = Path(fp)
+            # NOTE: this is a little pathological just because of the name that we have chosen in our config ...
+            spltname = re.split("\_|\.", x.name)
+            sex = spltname[3]
+            pheno = spltname[5]
+            df = pd.read_csv(fp, header=None, sep="\t")
+            df.columns = [
+                "CHROM",
+                    "POS",
+                    "ID",
+                    "P",
+                    "TOTAL",
+                    "NONSIG",
+                    "S0.05",
+                    "S0.01",
+                    "S0.001",
+                    "S0.0001",
+                    "SP2",
+                    "POS_A",
+                    "POS_B",
+                    "CHROM_X",
+                    "GeneStart",
+                    "GeneEnd",
+                    "Gencode",
+                    "Dist",
+                ]
+                df["PHENO"] = f"{pheno}_{sex}"
+            tot_dfs.append(df)
+            # Concatenate to create a final dataset
+        final_df = pd.concat(tot_dfs)
+        final_df = final_df[
+            [
+                "PHENO",
+                "CHROM",
+                "POS",
+                "ID",
+                "P",
+                "TOTAL",
+                "NONSIG",
+                "S0.05",
+                "S0.01",
+                "S0.001",
+                "S0.0001",
+                "SP2",
+                "GeneStart",
+                "GeneEnd",
+                "Gencode",
+                "Dist",
+            ]
+        ]
+        final_df.to_csv(snakemake.output["sumstats_final"], sep="\t", index=None)
