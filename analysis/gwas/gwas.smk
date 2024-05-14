@@ -428,12 +428,14 @@ rule obtain_effect_sizes:
         gwas_results="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
     output:
         header = temp("results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.header"),
+        temp_var_ids = temp("results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.tmp.var_ids"),
         temp_top_variants = temp("results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.tmp.top_vars"),
         top_variants = "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.top_vars",
     shell:
         """
         awk 'NR == 1 {{print $0}}' {input.gwas_results} | sed s'/#//g' > {output.header}
-        awk '{{print $3}}' {input.clumps} | while read line; do grep $line {input.gwas_results}; done > {output.temp_top_variants}
+        awk '{{print $3}}' {input.clumps} > {output.temp_var_ids} 
+        awk 'FNR == NR {{a[$1]++; next}} {{if ($3 in a) {{print $0}}}}' {output.temp_var_ids} {input.gwas_results} > {output.temp_top_variants} 
         cat {output.header} {output.temp_top_variants} > {output.top_variants}
         """
 
