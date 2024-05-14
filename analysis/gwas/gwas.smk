@@ -35,21 +35,6 @@ rule all:
             format="plink2",
             project_name=config["project_name"],
         ),
-        expand(
-            "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.sumstats.tsv",
-            format="plink2",
-            project_name=config["project_name"],
-            sex=["Male", "Female"],
-            pheno=[
-                "MeanCO",
-                "VarCO",
-                "cvCO",
-                "RandPheno",
-                "CentromereDist",
-                "TelomereDist",
-                "HotspotOccupancy",
-            ],
-        ),
 
 
 # ------- 0. Preprocess Genetic data ------- #
@@ -152,6 +137,7 @@ rule king_related_individuals:
 rule create_full_covariates:
     """Create the full set of covariates to use downstream GWAS applications."""
     input:
+        co_data=config['crossovers'],
         evecs="results/covariates/{project_name}.eigenvec",
         metadata=config["metadata"],
     output:
@@ -303,6 +289,7 @@ rule create_sex_exclude_file:
             out_df = concat_df[["#FID", "IID"]].drop_duplicates(subset=["IID"])
         out_df.to_csv(output["sex_specific"], index=None, sep="\t")
 
+# -------- GWAS Steps in REGENIE ---------- #
 
 rule regenie_step1:
     """Run the first step of REGENIE for polygenic prediction."""
