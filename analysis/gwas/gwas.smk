@@ -424,20 +424,27 @@ rule plink_clumping:
 rule obtain_effect_sizes:
     """Obtain effect sizes for lead variants in a clump."""
     input:
-        clumps = "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.clumps",
+        clumps="results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.clumps",
         gwas_results="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
     output:
-        header = temp("results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.header"),
-        temp_var_ids = temp("results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.tmp.var_ids"),
-        temp_top_variants = temp("results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.tmp.top_vars"),
-        top_variants = "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.top_vars",
+        header=temp(
+            "results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.header"
+        ),
+        temp_var_ids=temp(
+            "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.tmp.var_ids"
+        ),
+        temp_top_variants=temp(
+            "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.tmp.top_vars"
+        ),
+        top_variants="results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.top_vars",
     shell:
         """
         awk 'NR == 1 {{print $0}}' {input.gwas_results} | sed s'/#//g' > {output.header}
-        awk '{{print $3}}' {input.clumps} > {output.temp_var_ids} 
+        awk 'NR > 1 {{print $3}}' {input.clumps} > {output.temp_var_ids} 
         awk 'FNR == NR {{a[$1]++; next}} {{if ($3 in a) {{print $0}}}}' {output.temp_var_ids} {input.gwas_results} > {output.temp_top_variants} 
         cat {output.header} {output.temp_top_variants} > {output.top_variants}
         """
+
 
 rule obtain_allele_frequencies:
     input:
@@ -445,10 +452,12 @@ rule obtain_allele_frequencies:
         psam="results/pgen_input/{project_name}.psam",
         pvar="results/pgen_input/{project_name}.pvar",
         sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
-        clumps = "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.clumps",
+        clumps="results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.clumps",
     output:
-        temp_vars = temp("results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.freqs.tmpvars"),
-        freqs = "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.afreq",
+        temp_vars=temp(
+            "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.freqs.tmpvars"
+        ),
+        freqs="results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.afreq",
     params:
         outfix=lambda wildcards: f"results/gwas_output/{wildcards.format}/clumped/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}.{wildcards.pheno}",
     threads: 4
@@ -458,7 +467,9 @@ rule obtain_allele_frequencies:
         plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --threads {threads} --extract {output.temp_vars} --remove {input.sex_exclusion} --freq --out {params.outfix}
         """
 
+
 # ----------- Mapping variants to genes ----------- #
+
 
 rule reformat_gencode_bed:
     input:
@@ -494,61 +505,23 @@ rule map_snp2gene:
         """
 
 
-rule combine_gwas_results:
-    """Combine GWAS results across """
+rule combine_gwas_effect_size_afreq:
     input:
-        sumstats=expand(
-            "results/gwas_output/{{format}}/clumped/{{project_name}}_{sex}_{{format}}.{pheno}.sumstats.tsv",
-            pheno=[
-                "MeanCO",
-                "VarCO",
-                "cvCO",
-                "RandPheno",
-                "CentromereDist",
-                "TelomereDist",
-                "HotspotOccupancy",
-            ],
-            sex=["Male", "Female"],
-        ),
-        effect_sizes=expand(
-            "results/gwas_output/{{format}}/clumped/{{project_name}}_{sex}_{{format}}.{pheno}.top_vars",
-            pheno=[
-                "MeanCO",
-                "VarCO",
-                "cvCO",
-                "RandPheno",
-                "CentromereDist",
-                "TelomereDist",
-                "HotspotOccupancy",
-            ],
-            sex=["Male", "Female"],
-        ),
-        allele_freqs=expand(
-            "results/gwas_output/{{format}}/clumped/{{project_name}}_{sex}_{{format}}.{pheno}.afreq",
-            pheno=[
-                "MeanCO",
-                "VarCO",
-                "cvCO",
-                "RandPheno",
-                "CentromereDist",
-                "TelomereDist",
-                "HotspotOccupancy",
-            ],
-            sex=["Male", "Female"],
-        ),
+        sumstats="results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.sumstats.tsv",
+        freqs="results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.afreq",
+        top_variants="results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.top_vars",
     output:
-        sumstats_final="results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv",
+        final_sumstats="results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.sumstats.final.tsv",
+    wildcard_constraints:
+        format="plink2"
     run:
-        tot_dfs = []
-        for fp in input.sumstats:
-            x = Path(fp)
-            # NOTE: this is a little pathological just because of the name that we have chosen in our config ...
-            spltname = re.split("\_|\.", x.name)
-            sex = spltname[3]
-            pheno = spltname[5]
-            df = pd.read_csv(fp, header=None, sep="\t")
-            df.columns = [
-                "CHROM",
+        x = Path(input.sumstats)
+        spltname = re.split("\_|\.", x.name)
+        sex = spltname[3]
+        pheno = spltname[5]
+        df = pd.read_csv(input.sumstats, header=None, sep="\t")
+        df.columns = [
+            "CHROM",
                 "POS",
                 "ID",
                 "P",
@@ -566,17 +539,26 @@ rule combine_gwas_results:
                 "GeneEnd",
                 "Gencode",
                 "Dist",
-                ]
-            df["PHENO"] = f"{pheno}_{sex}"
-            tot_dfs.append(df)
-        final_df = pd.concat(tot_dfs)
-        final_df = final_df[
+            ]
+        df["PHENO"] = f"{pheno}_{sex}"
+        freq_df = pd.read_csv(input.freqs, sep="\t")
+        freq_df.rename(columns={'#CHROM': 'CHROM'}, inplace=True)
+        beta_df = pd.read_csv(input.top_variants, sep="\t")
+        beta_df = beta_df.merge(freq_df[['ID', 'REF', 'ALT', 'ALT_FREQS']], on=['ID', 'REF', 'ALT'], how='left')
+        df = df.merge(beta_df[['ID','REF','ALT', 'A1', 'BETA', 'SE', 'T_STAT', 'OBS_CT', 'ALT_FREQS']], on=["ID"], how="left")
+        final_df = df[
             [
                 "PHENO",
-                "CHROM",
-                "POS",
                 "ID",
                 "P",
+                "REF",
+                "ALT",
+                "ALT_FREQS",
+                "OBS_CT",
+                "BETA",
+                "SE",
+                "A1",
+                "T_STAT",
                 "TOTAL",
                 "NONSIG",
                 "S0.05",
@@ -590,4 +572,31 @@ rule combine_gwas_results:
                 "Dist",
             ]
         ]
+        final_df.to_csv(output.final_sumstats, sep="\t", index=None)
+
+
+rule combine_gwas_results:
+    """Combine GWAS results across """
+    input:
+        sumstats=expand(
+            "results/gwas_output/{{format}}/clumped/{{project_name}}_{sex}_{{format}}.{pheno}.sumstats.final.tsv",
+            pheno=[
+                "MeanCO",
+                "VarCO",
+                "cvCO",
+                "RandPheno",
+                "CentromereDist",
+                "TelomereDist",
+                "HotspotOccupancy",
+            ],
+            sex=["Male", "Female"],
+        ),
+    output:
+        sumstats_final="results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv",
+    run:
+        tot_dfs = []
+        for fp in input.sumstats:
+            df = pd.read_csv(fp, sep="\t")
+            tot_dfs.append(df)
+        final_df = pd.concat(tot_dfs)
         final_df.to_csv(output.sumstats_final, sep="\t", index=None)
