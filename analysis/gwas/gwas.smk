@@ -424,7 +424,7 @@ rule plink_clumping:
 rule obtain_effect_sizes:
     """Obtain effect sizes for lead variants in a clump."""
     input:
-        clumps = "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.clumps"
+        clumps = "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.clumps",
         gwas_results="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
     output:
         header = temp("results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.header"),
@@ -432,14 +432,29 @@ rule obtain_effect_sizes:
         top_variants = "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.top_vars",
     shell:
         """
-        awk 'NR == 1 {print $0}' {input.gwas_results} | sed s'/#//g' > {output.header}
-        awk '{print $3}' {input.clumps} | while read line; do grep $line {input.gwas_results}; done > {output.temp_top_variants}
+        awk 'NR == 1 {{print $0}}' {input.gwas_results} | sed s'/#//g' > {output.header}
+        awk '{{print $3}}' {input.clumps} | while read line; do grep $line {input.gwas_results}; done > {output.temp_top_variants}
         cat {output.header} {output.temp_top_variants} > {output.top_variants}
         """
 
-# rule obtain_allele_frequencies:
-    # input:
-        
+rule obtain_allele_frequencies:
+    input:
+        pgen="results/pgen_input/{project_name}.pgen",
+        psam="results/pgen_input/{project_name}.psam",
+        pvar="results/pgen_input/{project_name}.pvar",
+        sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
+        clumps = "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.clumps",
+    output:
+        temp_vars = temp("results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.freqs.tmpvars"),
+        freqs = "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.afreq",
+    params:
+        outfix=lambda wildcards: f"results/gwas_output/{wildcards.format}/clumped/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}.{wildcards.pheno}",
+    threads: 4
+    shell:
+        """
+        awk 'NR > 1 {{print $3}}' {input.clumps} > {output.temp_vars}
+        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --threads {threads} --extract {output.temp_vars} --remove {input.sex_exclusion} --freq --out {params.outfix}
+        """
 
 # ----------- Mapping variants to genes ----------- #
 
@@ -482,6 +497,32 @@ rule combine_gwas_results:
     input:
         sumstats=expand(
             "results/gwas_output/{{format}}/clumped/{{project_name}}_{sex}_{{format}}.{pheno}.sumstats.tsv",
+            pheno=[
+                "MeanCO",
+                "VarCO",
+                "cvCO",
+                "RandPheno",
+                "CentromereDist",
+                "TelomereDist",
+                "HotspotOccupancy",
+            ],
+            sex=["Male", "Female"],
+        ),
+        effect_sizes=expand(
+            "results/gwas_output/{{format}}/clumped/{{project_name}}_{sex}_{{format}}.{pheno}.top_vars",
+            pheno=[
+                "MeanCO",
+                "VarCO",
+                "cvCO",
+                "RandPheno",
+                "CentromereDist",
+                "TelomereDist",
+                "HotspotOccupancy",
+            ],
+            sex=["Male", "Female"],
+        ),
+        allele_freqs=expand(
+            "results/gwas_output/{{format}}/clumped/{{project_name}}_{sex}_{{format}}.{pheno}.afreq",
             pheno=[
                 "MeanCO",
                 "VarCO",
