@@ -118,6 +118,7 @@ rule king_related_individuals:
         pgen="results/pgen_input/{project_name}.pgen",
         psam="results/pgen_input/{project_name}.psam",
         pvar="results/pgen_input/{project_name}.pvar",
+        keep_variants="results/covariates/{project_name}.prune.in"
     output:
         king_includes=temp("results/covariates/{project_name}.king.cutoff.in.id"),
         king_excludes="results/covariates/{project_name}.king.cutoff.out.id",
@@ -130,7 +131,7 @@ rule king_related_individuals:
         king_thresh=0.125,
     shell:
         """
-        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --threads {threads} --maf 0.01 --king-cutoff {params.king_thresh} --out {params.outfix}
+        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --extract {input.keep_variants} --threads {threads} --maf 0.01 --king-cutoff {params.king_thresh} --out {params.outfix}
         """
 
 
@@ -246,6 +247,7 @@ rule combine_phenotypes:
         format="plink2|regenie",
     params:
         plink_format=lambda wildcards: wildcards.format == "plink2",
+        outlier_sd=3,
     run:
         abundance_df = pd.read_csv(input.abundance_pheno, sep="\t")
         location_df = pd.read_csv(input.location_pheno, sep="\t")
@@ -254,11 +256,21 @@ rule combine_phenotypes:
             merge1_df = abundance_df.merge(location_df, on=["#FID", "IID"], how="outer")
             pheno_df = merge1_df.merge(hotspot_df, on=["#FID", "IID"], how="outer")
             pheno_df.drop_duplicates(subset=["IID"], inplace=True)
+            for k in pheno_df.columns:
+                if k not in ["#FID", "IID"]:
+                    x = pheno_df[k].values
+                    mu, sd = np.nanmean(x), np.nanstd(x)
+                    pheno_df[k] = pheno_df[k].where((mu-params.outlier_sd*sd <= pheno_df[k]) & (pheno_df[k] <= mu+params.outlier_sd*sd))
             pheno_df.to_csv(output.pheno, sep="\t", na_rep="NA", index=None)
         else:
             merge1_df = abundance_df.merge(location_df, on=["FID", "IID"], how="outer")
             pheno_df = merge1_df.merge(hotspot_df, on=["FID", "IID"], how="outer")
             pheno_df.drop_duplicates(subset=["IID"], inplace=True)
+            for k in pheno_df.columns:
+                if k not in ["FID", "IID"]:
+                    x = pheno_df[k].values
+                    mu, sd = np.nanmean(x), np.nanstd(x)
+                    pheno_df[k] = pheno_df[k].where((mu-params.outlier_sd*sd <= pheno_df[k]) & (pheno_df[k] <= mu+params.outlier_sd*sd))
             pheno_df.to_csv(output.pheno, sep="\t", na_rep="NA", index=None)
 
 
