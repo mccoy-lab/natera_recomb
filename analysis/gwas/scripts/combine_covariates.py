@@ -42,8 +42,7 @@ def generate_parent_meta(meta_df):
         ],
     )
     parent_meta_out_df = parent_meta_df[["array", "array", "sex", "age"]]
-    parent_meta_out_df["age2"] = parent_meta_out_df["age"] ** 2.0
-    parent_meta_out_df.columns = ["FID", "IID", "Sex", "Age", "Age2"]
+    parent_meta_out_df.columns = ["FID", "IID", "Sex", "Age"]
     return parent_meta_out_df
 
 
