@@ -8,7 +8,7 @@ from tqdm import tqdm
 cv = lambda x: np.nanstd(x) / np.nanmean(x)
 
 
-def mean_var_co_per_genome(df):
+def mean_var_co_per_genome(df, randomize=True, seed=42):
     """Compute the average number of crossovers per-chromosome for an individual."""
     assert "mother" in df.columns
     assert "father" in df.columns
@@ -23,19 +23,27 @@ def mean_var_co_per_genome(df):
             ["mother", "father", "child", "crossover_sex", "n_crossover"]
         ]
     )
-    data = []
+    mat_data = []
     for m in tqdm(np.unique(co_df.mother)):
         values = co_df[(co_df.mother == m) & (co_df.crossover_sex == "maternal")][
             "n_crossover"
         ].values
-        data.append([m, m, np.nanmean(values), np.nanvar(values), cv(values)])
+        mat_data.append([m, m, np.nanmean(values), np.nanvar(values), cv(values)])
+    mat_df = pd.DataFrame(mat_data)
+    mat_df.columns = ["FID", "IID", "MeanCO", "VarCO", "cvCO"]
+    pat_data = []
     for p in tqdm(np.unique(df.father)):
         values = co_df[(co_df.father == p) & (co_df.crossover_sex == "paternal")][
             "n_crossover"
         ].values
-        data.append([p, p, np.nanmean(values), np.nanvar(values), cv(values)])
-    out_df = pd.DataFrame(data)
-    out_df.columns = ["FID", "IID", "MeanCO", "VarCO", "cvCO"]
+        pat_data.append([p, p, np.nanmean(values), np.nanvar(values), cv(values)])
+    pat_df = pd.DataFrame(pat_data)
+    pat_df.columns = ["FID", "IID", "MeanCO", "VarCO", "cvCO"]
+    if randomize:
+        np.random.seed(seed)
+        pat_df["RandMeanCO"] = np.random.permutation(pat_df["MeanCO"].values)
+        mat_df["RandMeanCO"] = np.random.permutation(mat_df["MeanCO"].values)
+    out_df = pd.concat([mat_df, pat_df])
     return out_df
 
 

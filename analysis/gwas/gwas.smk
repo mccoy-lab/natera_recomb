@@ -377,6 +377,7 @@ rule plink_regression:
         expand(
             "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}.{pheno}.glm.linear",
             pheno=[
+                "RandMeanCO",
                 "MeanCO",
                 "VarCO",
                 "cvCO",
@@ -415,7 +416,7 @@ rule plink_clumping:
         format="plink2",
     params:
         outfix=lambda wildcards: f"results/gwas_output/{wildcards.format}/clumped/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}.{wildcards.pheno}",
-        pval=1e-6,
+        pval=1e-5,
     shell:
         "plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --threads {threads} --clump-unphased --clump {input.gwas_results} --clump-r2 0.1 --clump-kb 1000 --remove {input.sex_exclusion} --clump-p1 {params.pval} --out {params.outfix}"
 
@@ -580,6 +581,7 @@ rule combine_gwas_results:
         sumstats=expand(
             "results/gwas_output/{{format}}/clumped/{{project_name}}_{sex}_{{format}}.{pheno}.sumstats.final.tsv",
             pheno=[
+                "RandMeanCO",
                 "MeanCO",
                 "VarCO",
                 "cvCO",

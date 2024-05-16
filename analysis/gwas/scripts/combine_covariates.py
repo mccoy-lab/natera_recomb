@@ -7,15 +7,31 @@ def generate_co_meta(co_df):
     for a in ["mother", "father", "avg_pi0", "avg_sigma"]:
         assert a in co_df.columns
     mother_df = (
-        co_df.groupby("mother")[["avg_pi0", "avg_sigma"]].agg("mean").reset_index()
+        co_df.groupby("mother")[["avg_pi0", "avg_sigma", "child"]]
+        .agg(
+            {
+                "avg_pi0": "mean",
+                "avg_sigma": "mean",
+                "child": lambda x: np.unique(x).size,
+            }
+        )
+        .reset_index()
     )
-    mother_df = mother_df[["mother", "mother", "avg_pi0", "avg_sigma"]]
-    mother_df.columns = ["FID", "IID", "AVGPI0", "AVGSIGMA"]
+    mother_df = mother_df[["mother", "mother", "avg_pi0", "avg_sigma", "child"]]
+    mother_df.columns = ["FID", "IID", "AVGPI0", "AVGSIGMA", "NEMBRYO"]
     father_df = (
-        co_df.groupby("father")[["avg_pi0", "avg_sigma"]].agg("mean").reset_index()
+        co_df.groupby("father")[["avg_pi0", "avg_sigma", "child"]]
+        .agg(
+            {
+                "avg_pi0": "mean",
+                "avg_sigma": "mean",
+                "child": lambda x: np.unique(x).size,
+            }
+        )
+        .reset_index()
     )
-    father_df = father_df[["father", "father", "avg_pi0", "avg_sigma"]]
-    father_df.columns = ["FID", "IID", "AVGPI0", "AVGSIGMA"]
+    father_df = father_df[["father", "father", "avg_pi0", "avg_sigma", "child"]]
+    father_df.columns = ["FID", "IID", "AVGPI0", "AVGSIGMA", "NEMBRYO"]
     res_df = pd.concat([mother_df, father_df])
     return res_df
 
