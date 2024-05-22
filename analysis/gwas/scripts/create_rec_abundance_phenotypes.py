@@ -8,15 +8,21 @@ from tqdm import tqdm
 cv = lambda x: np.nanstd(x) / np.nanmean(x)
 
 
-def mean_var_co_per_genome(df, randomize=True, seed=42):
+def mean_var_co_per_genome(df, randomize=True, frac_siblings=0.75, seed=42):
     """Compute the average number of crossovers per-chromosome for an individual."""
     assert "mother" in df.columns
     assert "father" in df.columns
     assert "child" in df.columns
     assert "crossover_sex" in df.columns
     assert "chrom" in df.columns
+    assert "nsibs" in df.columns
+    assert "nsib_support" in df.columns
+    assert frac_siblings >= 0.5
+    assert seed > 0
+    df["frac_siblings"] = df["nsib_support"] / (df["nsibs"] - 1)
     co_df = (
-        df.groupby(["mother", "father", "child", "crossover_sex"])
+        df[df["frac_siblings"] > frac_siblings]
+        .groupby(["mother", "father", "child", "crossover_sex"])
         .count()
         .reset_index()
         .rename(columns={"chrom": "n_crossover"})[

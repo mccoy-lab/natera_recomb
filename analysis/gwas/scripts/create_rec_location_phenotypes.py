@@ -18,7 +18,7 @@ def telomere_dist(chrom, pos, telomere_dict):
     return dist
 
 
-def avg_dist_centromere(df, centromere_df):
+def avg_dist_centromere(df, centromere_df, frac_siblings=0.75):
     """Compute the average distance in bp from centromere of the nearest crossover."""
     assert "mother" in df.columns
     assert "father" in df.columns
@@ -26,6 +26,10 @@ def avg_dist_centromere(df, centromere_df):
     assert "crossover_sex" in df.columns
     assert "chrom" in df.columns
     assert "avg_pos" in df.columns
+    assert "nsibs" in df.columns
+    assert "nsib_support" in df.columns
+    assert frac_siblings >= 0.5
+    df["frac_siblings"] = df["nsib_support"] / (df["nsibs"] - 1)
     centromere_dict = (
         centromere_df.groupby("chrom").agg({"start": np.min, "end": np.max}).to_dict()
     )
@@ -36,7 +40,8 @@ def avg_dist_centromere(df, centromere_df):
         )
     df["centromere_dist"] = centromere_dists
     filt_df = (
-        df.groupby(["mother", "father", "child", "chrom", "crossover_sex"])
+        df[df["frac_siblings"] > frac_siblings]
+        .groupby(["mother", "father", "child", "chrom", "crossover_sex"])
         .agg({"centromere_dist": np.min})
         .reset_index()
         .groupby(["mother", "father", "crossover_sex"])
@@ -55,7 +60,7 @@ def avg_dist_centromere(df, centromere_df):
     return tot_df
 
 
-def avg_dist_telomere(df, telomere_df):
+def avg_dist_telomere(df, telomere_df, frac_siblings=0.75):
     """Compute the average distance in bp from the telomeres of the nearest crossover."""
     assert "mother" in df.columns
     assert "father" in df.columns
@@ -63,6 +68,10 @@ def avg_dist_telomere(df, telomere_df):
     assert "crossover_sex" in df.columns
     assert "chrom" in df.columns
     assert "avg_pos" in df.columns
+    assert "nsibs" in df.columns
+    assert "nsib_support" in df.columns
+    assert frac_siblings >= 0.5
+    df["frac_siblings"] = df["nsib_support"] / (df["nsibs"] - 1)
     telomere_dict = (
         telomere_df.groupby("chrom").agg({"start": np.min, "end": np.max}).to_dict()
     )
@@ -71,7 +80,8 @@ def avg_dist_telomere(df, telomere_df):
         telomere_dists[i] = telomere_dist(chrom, pos, telomere_dict=telomere_dict)
     df["telomere_dist"] = telomere_dists
     filt_df = (
-        df.groupby(["mother", "father", "child", "chrom", "crossover_sex"])
+        df[df["frac_siblings"] > frac_siblings]
+        .groupby(["mother", "father", "child", "chrom", "crossover_sex"])
         .agg({"telomere_dist": np.min})
         .reset_index()
         .groupby(["mother", "father", "crossover_sex"])
