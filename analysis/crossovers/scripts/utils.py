@@ -71,11 +71,23 @@ def prep_data(family_dict, names, chrom="chr21"):
     return mat_haps, pat_haps, bafs, real_names, pos
 
 
-def est_genotype_quality():
+def est_genotype_quality(hmm_data, pos, chrom="chr21"):
     """Estimate the genotype quality by the local estimate of disomy at each SNP across the sibling embryos."""
-    raise NotImplementedError(
-        "Estimation of genotype quality has not be established yet!"
-    )
+    assert len(hmm_data) > 0
+    assert pos.size > 0
+    hmm = MetaHMM()
+    posterior_disomy_agg = []
+    for k in hmm_data:
+        cur_pos = hmm_data[k][chrom]["pos"]
+        g, karyo = hmm.marginal_posterior_karyotypes(
+            hmm_data[k][chrom]["gammas"], hmm_data[k][chrom]["karyotypes"]
+        )
+        assert g.shape[1] == cur_pos.size
+        cur_posterior_disomy = g[np.where(karyo == "2")[0], np.isin(cur_pos, pos)]
+        posterior_disomy_agg.append(cur_posterior_disomy)
+    posterior_disomy = np.mean(np.vstack(posterior_disomy_agg), axis=0)
+    assert posterior_disomy.size == pos.size
+    return posterior_disomy
 
 
 def extract_parameters(aneuploidy_df, mother, father, names, chrom):
