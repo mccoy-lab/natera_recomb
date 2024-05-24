@@ -2,7 +2,7 @@ import gzip as gz
 import pickle
 import sys
 from pathlib import Path
-
+from karyohmm import MetaHMM
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -69,6 +69,13 @@ def prep_data(family_dict, names, chrom="chr21"):
         # NOTE: this only happens when we have all embryos as aneuploid for the chromosome.
         pass
     return mat_haps, pat_haps, bafs, real_names, pos
+
+
+def est_genotype_quality():
+    """Estimate the genotype quality by the local estimate of disomy at each SNP across the sibling embryos."""
+    raise NotImplementedError(
+        "Estimation of genotype quality has not be established yet!"
+    )
 
 
 def extract_parameters(aneuploidy_df, mother, father, names, chrom):
