@@ -31,7 +31,10 @@ if __name__ == "__main__":
             family_dict=family_data, chrom=c, names=cur_names
         )
         if pos is not None:
-            posterior_disomy = est_genotype_quality(hmm_data, pos=pos, chrom=c)
+            posterior_disomy, posterior_pos = est_genotype_quality(
+                hmm_data, names=real_names, chrom=c
+            )
+            assert posterior_pos.size == pos.size
         nsibs = len(real_names)
         if nsibs >= 3:
             phase_correct = PhaseCorrect(mat_haps=mat_haps, pat_haps=pat_haps, pos=pos)
