@@ -14,6 +14,7 @@ if __name__ == "__main__":
     aneuploidy_df = pd.read_csv(snakemake.input["aneuploidy_calls"], sep="\t")
     hmm_dis = MetaHMM(disomy=True)
     family_data = load_baf_data(snakemake.input["baf_pkl"])
+    hmm_data = load_baf_data(snakemake.input["hmm_pkl"])
     names = [k for k in family_data.keys()]
     recomb_dict = {}
     lines = []
@@ -29,6 +30,11 @@ if __name__ == "__main__":
         mat_haps, pat_haps, bafs, real_names, pos = prep_data(
             family_dict=family_data, chrom=c, names=cur_names
         )
+        if pos is not None:
+            posterior_disomy, posterior_pos = est_genotype_quality(
+                hmm_data, names=real_names, chrom=c
+            )
+            assert posterior_pos.size == pos.size
         nsibs = len(real_names)
         if nsibs >= 3:
             phase_correct = PhaseCorrect(mat_haps=mat_haps, pat_haps=pat_haps, pos=pos)
@@ -90,30 +96,34 @@ if __name__ == "__main__":
                     left_pos, right_pos = m
                     # Take the midpoint here ...
                     rec_pos = int((left_pos + right_pos) / 2)
+                    geno_qual_left = posterior_disomy[pos == left_pos][0]
+                    geno_qual_right = posterior_disomy[pos == right_pos][0]
                     lines.append(
-                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tmaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t{mat_rec_support[j]}\t{pos.size}\n'
+                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tmaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{geno_qual_left}\t{geno_qual_right}\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t{mat_rec_support[j]}\t{pos.size}\n'
                     )
                 for j, p in enumerate(pat_rec):
                     left_pos, right_pos = p
                     rec_pos = int((left_pos + right_pos) / 2)
+                    geno_qual_left = posterior_disomy[pos == left_pos][0]
+                    geno_qual_right = posterior_disomy[pos == right_pos][0]
                     lines.append(
-                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tpaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t{pat_rec_support[j]}\t{pos.size}\n'
+                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tpaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{geno_qual_left}\t{geno_qual_right}\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t{pat_rec_support[j]}\t{pos.size}\n'
                     )
                 # NOTE: Cases of no crossover recombination detected as well ...
                 if mat_rec is []:
                     lines.append(
-                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tmaternal\t{nan}\t{nan}\t{nan}\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t0\t{pos.size}\n'
+                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tmaternal\tNA\tNA\tNA\tNA\tNA\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t0\t{pos.size}\n'
                     )
                 if pat_rec is []:
                     lines.append(
-                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tpaternal\t{nan}\t{nan}\t{nan}\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t0\t{pos.size}\n'
+                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tpaternal\tNA\tNA\tNA\tNA\tNA\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t0\t{pos.size}\n'
                     )
         else:
             pass
     # Write out crossover location output here ...
     with open(snakemake.output["est_recomb"], "w") as out:
         out.write(
-            "mother\tfather\tchild\tchrom\tcrossover_sex\tmin_pos\tavg_pos\tmax_pos\tavg_pi0\tavg_sigma\tnsibs\tnsib_support\tnsnps\n"
+            "mother\tfather\tchild\tchrom\tcrossover_sex\tmin_pos\tavg_pos\tmax_pos\tmin_pos_qual\tmax_pos_qual\tavg_pi0\tavg_sigma\tnsibs\tnsib_support\tnsnps\n"
         )
         for line in lines:
             out.write(line)

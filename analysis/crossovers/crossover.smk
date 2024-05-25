@@ -197,7 +197,7 @@ rule filter_putative_euploid_triplets:
         "scripts/filter_euploid.py"
 
 
-def define_triplets(
+def define_triplets_baf(
     mother_id,
     father_id,
     trio_file="results/natera_inference/valid_trios.triplets.txt",
@@ -210,6 +210,18 @@ def define_triplets(
         res.append(f"{base_path}/{mother_id}+{father_id}/{c}.bafs.pkl.gz")
     return res
 
+def define_triplets_hmm(
+    mother_id,
+    father_id,
+    trio_file="results/natera_inference/valid_trios.triplets.txt",
+    base_path="/home/abiddan1/scratch16/natera_aneuploidy/analysis/aneuploidy/results/natera_inference",
+):
+    trio_df = pd.read_csv(trio_file, sep="\t")
+    filt_df = trio_df[(trio_df.mother == mother_id) & (trio_df.father == father_id)]
+    res = []
+    for c in filt_df.child.values:
+        res.append(f"{base_path}/{mother_id}+{father_id}/{c}.hmm_model.pkl.gz")
+    return res
 
 rule est_params_euploid_chrom_trio:
     """Estimate crossover events for euploid chromosomes in trio datasets."""
@@ -235,9 +247,10 @@ rule est_crossover_euploid_chrom_trio_heuristic:
     """Estimate crossover events for euploid chromosomes in trio datasets using the heuristic approach of Coop et al 2007."""
     input:
         triplets="results/natera_inference/valid_trios.triplets.txt",
-        baf_pkl=lambda wildcards: define_triplets(
+        baf_pkl=lambda wildcards: define_triplets_baf(
             mother_id=wildcards.mother, father_id=wildcards.father
         ),
+        hmm_pkl=lambda wildcards: define_triplets_hmm(mother_id=wildcards.mother, father_id=wildcards.father),
         aneuploidy_calls=aneuploidy_calls,
     output:
         est_recomb="results/natera_inference_heuristic/{mother}+{father}.est_recomb.tsv",
@@ -253,7 +266,7 @@ rule est_crossover_euploid_chrom_trio_heuristic:
         "scripts/sibling_rec_est.py"
 
 
-# --------- Identifying crossovers in trisomies -------- #
+# --------- Identifying crossovers in trisomies via BPH vs SPH transitions -------- #
 rule isolate_trisomies:
     """Isolate potential trisomies that we should test using the """
     input:
