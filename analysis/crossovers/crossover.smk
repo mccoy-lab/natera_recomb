@@ -99,8 +99,8 @@ if Path("results/natera_inference/valid_trios.triplets.txt").is_file():
         total_params = np.unique(total_params).tolist()
         total_data = np.unique(total_data).tolist()
 
-if Path("results/natera_inference_trisomy/valid_trisomies.txt").is_file():
-    with open("results/natera_inference_trisomy/valid_trisomies.txt", "r") as fp:
+if Path("results/natera_inference_trisomy/valid_trisomies.tsv").is_file():
+    with open("results/natera_inference_trisomy/valid_trisomies.tsv", "r") as fp:
         for line in fp:
             [m, f, c, chrom] = line.rstrip().split()
             total_trisomy_data.append(
@@ -121,7 +121,6 @@ rule all:
     input:
         "results/natera_inference/valid_trios.triplets.txt",
         "results/natera_inference/valid_trios.triplets.euploid.txt",
-        "results/natera_inference_trisomy/valid_trisomies.txt",
         total_data,
         total_trisomy_data,
 
@@ -210,6 +209,7 @@ def define_triplets_baf(
         res.append(f"{base_path}/{mother_id}+{father_id}/{c}.bafs.pkl.gz")
     return res
 
+
 def define_triplets_hmm(
     mother_id,
     father_id,
@@ -222,6 +222,7 @@ def define_triplets_hmm(
     for c in filt_df.child.values:
         res.append(f"{base_path}/{mother_id}+{father_id}/{c}.hmm_model.pkl.gz")
     return res
+
 
 rule est_params_euploid_chrom_trio:
     """Estimate crossover events for euploid chromosomes in trio datasets."""
@@ -250,7 +251,9 @@ rule est_crossover_euploid_chrom_trio_heuristic:
         baf_pkl=lambda wildcards: define_triplets_baf(
             mother_id=wildcards.mother, father_id=wildcards.father
         ),
-        hmm_pkl=lambda wildcards: define_triplets_hmm(mother_id=wildcards.mother, father_id=wildcards.father),
+        hmm_pkl=lambda wildcards: define_triplets_hmm(
+            mother_id=wildcards.mother, father_id=wildcards.father
+        ),
         aneuploidy_calls=aneuploidy_calls,
     output:
         est_recomb="results/natera_inference_heuristic/{mother}+{father}.est_recomb.tsv",
@@ -268,7 +271,7 @@ rule est_crossover_euploid_chrom_trio_heuristic:
 
 # --------- Identifying crossovers in trisomies via BPH vs SPH transitions -------- #
 rule isolate_trisomies:
-    """Isolate potential trisomies that we should test using the """
+    """Isolate potential trisomies that we should test using BPH vs. SPH transitions."""
     input:
         aneuploidy_calls=aneuploidy_calls,
     output:
@@ -295,4 +298,3 @@ rule est_crossover_trisomic_chrom_trio:
         "results/natera_inference_trisomy/{mother}+{father}+{child}.{chrom}.est_recomb_trisomy.tsv",
     script:
         "scripts/sibling_co_trisomy.py"
-
