@@ -90,22 +90,26 @@ total_trisomy_data = []
 if Path("results/natera_inference/valid_trios.triplets.txt").is_file():
     with open("results/natera_inference/valid_trios.triplets.txt", "r") as fp:
         for i, line in enumerate(fp):
-            [m, f, _] = line.rstrip().split()
-            total_data.append(
-                f"results/natera_inference_heuristic/{m}+{f}.est_recomb.tsv"
-            )
-            if est_params:
-                total_params.append(f"results/natera_inference/{m}+{f}.est_params.tsv")
+            if i > 0:
+                [m, f, _] = line.rstrip().split()
+                total_data.append(
+                    f"results/natera_inference_heuristic/{m}+{f}.est_recomb.tsv"
+                )
+                if est_params:
+                    total_params.append(
+                        f"results/natera_inference/{m}+{f}.est_params.tsv"
+                    )
         total_params = np.unique(total_params).tolist()
         total_data = np.unique(total_data).tolist()
 
 if Path("results/natera_inference_trisomy/valid_trisomies.tsv").is_file():
     with open("results/natera_inference_trisomy/valid_trisomies.tsv", "r") as fp:
-        for line in fp:
-            [m, f, c, chrom] = line.rstrip().split()
-            total_trisomy_data.append(
-                f"results/natera_inference_trisomy/{m}+{f}+{c}.{chrom}.est_recomb_trisomy.tsv"
-            )
+        for i, line in enumerate(fp):
+            if i > 0:
+                [m, f, c, chrom] = line.rstrip().split()
+                total_trisomy_data.append(
+                    f"results/natera_inference_trisomy/{m}+{f}+{c}.{chrom}.est_recomb_trisomy.tsv"
+                )
 
 
 # ------- Rules Section ------- #
