@@ -28,21 +28,6 @@ rule all:
         ),
 
 
-# expand(
-#     "results/xo_interference/{name}.age_xo_interference.{recmap}.{chrom}.tsv",
-#     name=config["crossover_data"].keys(),
-#     recmap=config["recomb_maps"].keys(),
-#     chrom=["chr4", "chr10", "chr22"],
-# ),
-# expand(
-#     "results/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-rates.txt",
-#     sex=["maternal", "paternal"],
-#     raw=["raw", "split"],
-#     name=config["crossover_data"].keys(),
-#     chrom=["chr4", "chr10", "chr22"],
-# ),
-
-
 # ---------------- Analysis 1a. Conduct preprocessing analyses. -------- #
 rule filter_co_dataset:
     """Filter a crossover dataset according to the primary criteria."""
@@ -50,6 +35,8 @@ rule filter_co_dataset:
         crossover_data=lambda wildcards: config["crossover_data"][wildcards.name],
     output:
         co_filt_data="results/{name}.crossover_filt.tsv.gz",
+    params:
+        qual_thresh=0.95,
     run:
         import pandas as pd
 
@@ -58,9 +45,11 @@ rule filter_co_dataset:
         co_df["valid_co"] = ~co_df.duplicated(
             ["uid", "chrom", "crossover_sex", "min_pos", "max_pos"], keep=False
         )
-        co_df["qual_score"] = (co_df["min_pos_qual"] + co_df["max_pos_qual"]) / 2
+        co_df["qual_score"] = (co_df["min_pos_qual"] + co_df["max_pos_qual"]) / 2.0
         co_df["frac_siblings"] = co_df["nsib_support"] / (co_df["nsibs"] - 1)
-        valid_co_df = co_df[co_df["valid_co"]]
+        valid_co_df = co_df[
+            co_df["valid_co"] & (co_df["qual_score"] >= params.qual_thresh)
+        ]
         valid_co_df.to_csv(output.co_filt_data, sep="\t", index=None)
 
 
