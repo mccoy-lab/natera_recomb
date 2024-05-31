@@ -429,7 +429,12 @@ rule plink_clumping:
         outfix=lambda wildcards: f"results/gwas_output/{wildcards.format}/clumped/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}.{wildcards.pheno}",
         pval=1e-5,
     shell:
-        "plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --threads {threads} --clump-unphased --clump {input.gwas_results} --clump-r2 0.1 --clump-kb 1000 --remove {input.sex_exclusion} --clump-p1 {params.pval} --out {params.outfix}"
+        """
+        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar}\
+        --threads {threads} --memory 9000 --clump-unphased --clump {input.gwas_results}\
+        --clump-r2 0.1 --clump-kb 1000 --remove {input.sex_exclusion}\
+        --clump-p1 {params.pval} --out {params.outfix}
+        """
 
 
 rule obtain_effect_sizes:
