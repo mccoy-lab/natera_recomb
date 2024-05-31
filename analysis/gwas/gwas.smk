@@ -118,7 +118,7 @@ rule king_related_individuals:
         pgen="results/pgen_input/{project_name}.pgen",
         psam="results/pgen_input/{project_name}.psam",
         pvar="results/pgen_input/{project_name}.pvar",
-        keep_variants="results/covariates/{project_name}.prune.in"
+        keep_variants="results/covariates/{project_name}.prune.in",
     output:
         king_includes=temp("results/covariates/{project_name}.king.cutoff.in.id"),
         king_excludes="results/covariates/{project_name}.king.cutoff.out.id",
@@ -138,7 +138,7 @@ rule king_related_individuals:
 rule create_full_covariates:
     """Create the full set of covariates to use downstream GWAS applications."""
     input:
-        co_data=config['crossovers'],
+        co_data=config["crossovers"],
         evecs="results/covariates/{project_name}.eigenvec",
         metadata=config["metadata"],
     output:
@@ -146,8 +146,8 @@ rule create_full_covariates:
     wildcard_constraints:
         format="regenie|plink2",
     resources:
-        time="0:30:00",
-        mem_mb="1G",
+        time="1:00:00",
+        mem_mb="8G",
     params:
         plink_format=lambda wildcards: wildcards.format == "plink2",
     script:
@@ -162,8 +162,8 @@ rule create_rec_abundance_phenotypes:
     output:
         pheno="results/phenotypes/{project_name}.{format}.abundance.pheno",
     resources:
-        time="0:30:00",
-        mem_mb="1G",
+        time="1:00:00",
+        mem_mb="8G",
     params:
         plink_format=lambda wildcards: wildcards.format == "plink2",
     script:
@@ -181,8 +181,8 @@ rule create_sex_specific_hotspots:
     params:
         srr=10,
     resources:
-        time="0:10:00",
-        mem_mb="4G",
+        time="1:00:00",
+        mem_mb="8G",
     run:
         df = pd.read_csv(input.genmap, sep="\t", comment="#")
         df["SRR"] = df.cMperMb / df.cMperMb.mean()
@@ -205,7 +205,7 @@ rule create_hotspot_phenotypes:
         pheno_raw="results/phenotypes/{project_name}.{format}.hotspot.raw.pheno",
     resources:
         time="2:00:00",
-        mem_mb="5G",
+        mem_mb="8G",
     params:
         max_interval=50e3,
         nreps=100,
@@ -224,8 +224,8 @@ rule create_rec_location_phenotypes:
     output:
         pheno="results/phenotypes/{project_name}.{format}.location.pheno",
     resources:
-        time="0:30:00",
-        mem_mb="1G",
+        time="1:00:00",
+        mem_mb="8G",
     params:
         plink_format=lambda wildcards: wildcards.format == "plink2",
     script:
@@ -241,8 +241,8 @@ rule combine_phenotypes:
     output:
         pheno="results/phenotypes/{project_name}.{format}.pheno",
     resources:
-        time="0:30:00",
-        mem_mb="1G",
+        time="1:00:00",
+        mem_mb="8G",
     wildcard_constraints:
         format="plink2|regenie",
     params:
@@ -260,7 +260,10 @@ rule combine_phenotypes:
                 if k not in ["#FID", "IID"]:
                     x = pheno_df[k].values
                     mu, sd = np.nanmean(x), np.nanstd(x)
-                    pheno_df[k] = pheno_df[k].where((mu-params.outlier_sd*sd <= pheno_df[k]) & (pheno_df[k] <= mu+params.outlier_sd*sd))
+                    pheno_df[k] = pheno_df[k].where(
+                        (mu - params.outlier_sd * sd <= pheno_df[k])
+                        & (pheno_df[k] <= mu + params.outlier_sd * sd)
+                    )
             pheno_df.to_csv(output.pheno, sep="\t", na_rep="NA", index=None)
         else:
             merge1_df = abundance_df.merge(location_df, on=["FID", "IID"], how="outer")
@@ -270,7 +273,10 @@ rule combine_phenotypes:
                 if k not in ["FID", "IID"]:
                     x = pheno_df[k].values
                     mu, sd = np.nanmean(x), np.nanstd(x)
-                    pheno_df[k] = pheno_df[k].where((mu-params.outlier_sd*sd <= pheno_df[k]) & (pheno_df[k] <= mu+params.outlier_sd*sd))
+                    pheno_df[k] = pheno_df[k].where(
+                        (mu - params.outlier_sd * sd <= pheno_df[k])
+                        & (pheno_df[k] <= mu + params.outlier_sd * sd)
+                    )
             pheno_df.to_csv(output.pheno, sep="\t", na_rep="NA", index=None)
 
 
@@ -283,6 +289,9 @@ rule create_sex_exclude_file:
         sex_specific="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
     wildcard_constraints:
         sex="Male|Female",
+    resources:
+        time="1:00:00",
+        mem_mb="8G",
     params:
         plink_format=lambda wildcards: wildcards.format == "plink2",
     run:
@@ -301,7 +310,9 @@ rule create_sex_exclude_file:
             out_df = concat_df[["#FID", "IID"]].drop_duplicates(subset=["IID"])
         out_df.to_csv(output["sex_specific"], index=None, sep="\t")
 
+
 # -------- GWAS Steps in REGENIE ---------- #
+
 
 rule regenie_step1:
     """Run the first step of REGENIE for polygenic prediction."""
@@ -512,8 +523,11 @@ rule combine_gwas_effect_size_afreq:
         top_variants="results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.top_vars",
     output:
         final_sumstats="results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.sumstats.final.tsv",
+    resources:
+        time="1:00:00",
+        mem_mb="8G",
     wildcard_constraints:
-        format="plink2"
+        format="plink2",
     run:
         x = Path(input.sumstats)
         spltname = re.split("\_|\.", x.name)
@@ -542,10 +556,30 @@ rule combine_gwas_effect_size_afreq:
             ]
         df["PHENO"] = f"{pheno}_{sex}"
         freq_df = pd.read_csv(input.freqs, sep="\t")
-        freq_df.rename(columns={'#CHROM': 'CHROM'}, inplace=True)
+        freq_df.rename(columns={"#CHROM": "CHROM"}, inplace=True)
         beta_df = pd.read_csv(input.top_variants, sep="\t")
-        beta_df = beta_df.merge(freq_df[['ID', 'REF', 'ALT', 'ALT_FREQS']], on=['ID', 'REF', 'ALT'], how='left')
-        df = df.merge(beta_df[['ID','REF','ALT', 'A1', 'BETA', 'SE', 'T_STAT', 'OBS_CT', 'ALT_FREQS']], on=["ID"], how="left")
+        beta_df = beta_df.merge(
+            freq_df[["ID", "REF", "ALT", "ALT_FREQS"]],
+            on=["ID", "REF", "ALT"],
+            how="left",
+        )
+        df = df.merge(
+            beta_df[
+                [
+                    "ID",
+                    "REF",
+                    "ALT",
+                    "A1",
+                    "BETA",
+                    "SE",
+                    "T_STAT",
+                    "OBS_CT",
+                    "ALT_FREQS",
+                ]
+            ],
+            on=["ID"],
+            how="left",
+        )
         final_df = df[
             [
                 "PHENO",
@@ -594,6 +628,9 @@ rule combine_gwas_results:
         ),
     output:
         sumstats_final="results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv",
+    resources:
+        time="1:00:00",
+        mem_mb="8G",
     run:
         tot_dfs = []
         for fp in input.sumstats:
