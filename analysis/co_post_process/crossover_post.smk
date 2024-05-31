@@ -54,10 +54,12 @@ rule filter_co_dataset:
         import pandas as pd
 
         co_df = pd.read_csv(input.crossover_data, sep="\t")
-        co_df["uid"] = co_df['mother'].str.cat(co_df[['father', 'child']], sep='+')
+        co_df["uid"] = co_df["mother"].str.cat(co_df[["father", "child"]], sep="+")
         co_df["valid_co"] = ~co_df.duplicated(
             ["uid", "chrom", "crossover_sex", "min_pos", "max_pos"], keep=False
         )
+        co_df["qual_score"] = (co_df["min_pos_qual"] + co_df["max_pos_qual"]) / 2
+        co_df["frac_siblings"] = co_df["nsib_support"] / (co_df["nsibs"] - 1)
         valid_co_df = co_df[co_df["valid_co"]]
         valid_co_df.to_csv(output.co_filt_data, sep="\t", index=None)
 
@@ -157,6 +159,7 @@ rule estimate_chrom_specific_aneuploidy_effect:
         """
         Rscript --vanilla scripts/aneuploidy_effect_per_chrom.R {input.merged_tsv} {output.mean_per_chrom_effects} {output.var_per_chrom_effects}
         """
+
 
 # ------- Analysis 2. Estimate Crossover Interference Stratified by Age & Sex -------- #
 rule age_sex_stratified_co_interference:

@@ -17,6 +17,7 @@ co_sims:
   nsibs:
     - 3
     - 5
+    - 7
 phase_err:
   reps: 5
   phase_err:
@@ -33,7 +34,6 @@ phase_err:
   pi0:
     - 60
   nsibs:
-    - 2
     - 3
     - 5
     - 7
