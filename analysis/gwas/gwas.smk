@@ -718,7 +718,7 @@ rule per_chrom_reml:
         hsq="results/h2/h2sq_chrom/h2_est/{project_name}.{sex}.{chrom}.{pheno}.hsq",
     params:
         grmfix=lambda wildcards: f"results/h2/h2sq_chrom/grms/{wildcards.project_name}.{wildcards.sex}.{wildcards.chrom}",
-        outfix=lambda wildcards: f"results/h2/h2sq_chrom/{wildcards.project_name}.{wildcards.sex}.{wildcards.chrom}.{wildcards.pheno}",
+        outfix=lambda wildcards: f"results/h2/h2sq_chrom/h2_est/{wildcards.project_name}.{wildcards.sex}.{wildcards.chrom}.{wildcards.pheno}",
     resources:
         time="2:00:00",
         mem_mb="10G",
