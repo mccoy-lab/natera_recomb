@@ -559,7 +559,7 @@ rule combine_gwas_effect_size_afreq:
                 "Gencode",
                 "Dist",
             ]
-            df["PHENO"] = f"{pheno}_{sex}"
+        df["PHENO"] = f"{pheno}_{sex}"
         freq_df = pd.read_csv(input.freqs, sep="\t")
         freq_df.rename(columns={"#CHROM": "CHROM"}, inplace=True)
         beta_df = pd.read_csv(input.top_variants, sep="\t")
@@ -645,7 +645,17 @@ rule combine_gwas_results:
         final_df.to_csv(output.sumstats_final, sep="\t", index=None)
 
 
-# -------- 5. Heritability Estimation using GREML-LDMS from imputed data -------- #
+# -------- 5. Estimating per-chromosome h2 using GREML -------- #
+# rule estimate_per_chrom_grm:
+# input:
+# pgen="results/pgen_input/{project_name}.pgen",
+# psam="results/pgen_input/{project_name}.psam",
+# pvar="results/pgen_input/{project_name}.pvar",
+# king_excludes="results/covariates/{project_name}.king.cutoff.out.id",
+# output:
+
+
+# -------- 6. Heritability Estimation using GREML-LDMS from imputed data -------- #
 rule estimate_ld_scores:
     """Estimate the LD-scores per-variant using GCTA."""
     input:
@@ -654,17 +664,18 @@ rule estimate_ld_scores:
         pvar="results/pgen_input/{project_name}.pvar",
         king_excludes="results/covariates/{project_name}.king.cutoff.out.id",
     output:
-        "results/h2/ld_score/{wildcards.project_name}.{chrom}.score.ld",
+        "results/h2/hsq_ldms/ld_score/{wildcards.project_name}.{chrom}.score.ld",
     params:
         ldscore_region=1000,
         pfile=lambda wildcards: f"results/pgen_input/{wildcards.project_name}",
-        outfix=lambda wildcards: f"results/h2/ld_score/{wildcards.project_name}.{wildcards.chrom}",
+        outfix=lambda wildcards: f"results/h2/hsq_ldms/ld_score/{wildcards.project_name}.{wildcards.chrom}",
     threads: 8
     shell:
         """
         gcta --pfile {params.pfile}\
         --threads {threads} --chr {wildcards.chrom}\
-        --remove {input.king_excludes} --ld-score-region {params.ldscore_region}\
+        --remove {input.king_excludes}\
+        --ld-score-region {params.ldscore_region}\
         --out {params.outfix}
         """
 
@@ -673,11 +684,11 @@ rule partition_ld_scores:
     """Partition LD scores into multiple components."""
     input:
         expand(
-            "results/h2/ld_score/{{project_name}}.{chrom}.score.ld",
+            "results/h2//hsq_ldms/ld_score/{{project_name}}.{chrom}.score.ld",
             chrom=[f"chr{i}" for i in range(1, 23)],
         ),
     output:
-        "results/h2/ld_score/{project_name}.ld_{p}.mafbin{i}.txt",
+        "results/h2/hsq_ldms/ld_score/{project_name}.ld_{p}.maf_{i}.txt",
     params:
         partitions=config["h2"]["ld_bins"],
         maf_bins=[0.0, 0.01, 0.05, 0.1, 1.0],
@@ -692,11 +703,13 @@ rule create_grms:
         psam="results/pgen_input/{project_name}.psam",
         pvar="results/pgen_input/{project_name}.pvar",
         king_excludes="results/covariates/{project_name}.king.cutoff.out.id",
-        ldms_snps="results/h2/ld_score/{project_name}.{p}_of_{a}.mafbin{i}.txt",
+        ldms_snps="results/h2/h2sq_ldms/ld_score/{project_name}.ld_{p}.maf_{i}.txt",
     output:
-        grm="results/h2/grms/{project_name}.{p}_of_{a}.mafbin{i}.grm.bin",
-        grm_n="results/h2/grms/{project_name}.{p}_of_{a}.mafbin{i}.grm.N.bin",
-        grm_id="results/h2/grms/{project_name}.{p}_of_{a}.mafbin{i}.grm.N.id",
+        grm="results/h2/h2sq_ldms/grms/{project_name}.ld_{p}.maf_{i}.grm.bin",
+        grm_n="results/h2/h2sq_ldms/grms/{project_name}.ld_{p}.maf_{i}.grm.N.bin",
+        grm_id="results/h2/h2sq_ldms/grms/{project_name}.ld_{p}.maf_{i}.grm.N.id",
+    params:
+        outfix=lambda wildcards: f"results/h2/grms/{wildcards.project_name}.ld_{wildcards.p}.maf_{wildcards.i}",
     threads: 4
     shell:
         """
@@ -713,7 +726,7 @@ rule estimate_h2_ldms:
     """Estimate h2snp stratified by LD + MAF."""
     input:
         grms=expand(
-            "results/h2/grms/{{project_name}}.ld_{p}.mafbin{i}.grm.bin",
+            "results/h2/h2sq_ldms/grms/{{project_name}}.ld_{p}.maf_{i}.grm.bin",
             p=range(config["h2"]["ld_bins"]),
             i=range(config["h2"]["maf_bins"]),
         ),
@@ -722,8 +735,9 @@ rule estimate_h2_ldms:
         hsq="results/h2/h2sq_ldms/{project_name}.{pheno}.hsq",
     params:
         outfix=lambda wildcards: f"results/h2/h2sq_ldms/{wildcards.project_name}.{wildcards.pheno}",
-    threads: 4
+    threads: 8
     shell:
         """
+        ls {input.grms} > {output.mgrms}
         gcta --reml --mgrm {output.mgrms} --pheno {input.pheno} --out {params.outfix} --threads {threads}
         """
