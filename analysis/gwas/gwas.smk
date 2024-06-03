@@ -683,7 +683,20 @@ rule create_gcta_pheno:
     run:
         df = pd.read_csv(input.pheno, sep="\t")
         filt_df = df[["#FID", "IID", f"{wildcards.pheno}"]]
-        filt_df.to_csv(output.pheno, sep="\t", index=None, header=None)
+        filt_df.to_csv(output.pheno, sep="\t", na_rep="NA", index=None, header=None)
+
+
+rule create_gcta_covar:
+    """Create a GCTA-structured covariate file."""
+    input:
+        covar="results/covariates/{project_name}.covars.plink2.txt",
+    output:
+        covar="results/h2/h2sq_chrom/covars/{project_name}.{sex}.{chrom}.{pheno}.covars.txt",
+    run:
+        df = pd.read_csv(input.covar, sep="\t")
+        assert "Sex" in df.columns
+        df.drop(["Sex"], axis=1, inplace=True)
+        df.to_csv(output.covar, sep="\t", na_rep="NA", index=None)
 
 
 # Need a rule to create phenotypes for GCTA + covariates ...
@@ -691,20 +704,25 @@ rule per_chrom_reml:
     input:
         grm="results/h2/h2sq_chrom/grms/{project_name}.{sex}.{chrom}.grm.bin",
         pheno="results/h2/h2sq_chrom/pheno/{project_name}.{sex}.{chrom}.{pheno}.txt",
-        covar="results/covariates/{project_name}.covars.plink2.txt",
+        covar="results/h2/h2sq_chrom/covars/{project_name}.{sex}.{chrom}.{pheno}.covars.txt",
     output:
-        hsq="results/h2/h2sq_chrom/{project_name}.{sex}.{chrom}.{pheno}.hsq",
+        hsq="results/h2/h2sq_chrom/h2_est/{project_name}.{sex}.{chrom}.{pheno}.hsq",
     params:
-        grmfix=lambda wildcards: f"results/h2/h2sq_chrom/grms/{wildcards.project_name}.{wildcards.sex}.{wildcards.chrom}.{wildcards.pheno}",
+        grmfix=lambda wildcards: f"results/h2/h2sq_chrom/grms/{wildcards.project_name}.{wildcards.sex}.{wildcards.chrom}",
         outfix=lambda wildcards: f"results/h2/h2sq_chrom/{wildcards.project_name}.{wildcards.sex}.{wildcards.chrom}.{wildcards.pheno}",
+    threads: 8
     shell:
-        "gcta --reml --grm {params.grmfix} --pheno {input.pheno} --qcovar {input.covar} --out {params.outfix} --threads {threads}"
+        """
+        gcta --reml --grm {params.grmfix}\
+        --pheno {input.pheno} --qcovar {input.covar}\
+        --out {params.outfix} --threads {threads}
+        """
 
 
 rule test_per_chrom_h2:
     input:
         expand(
-            "results/h2/h2sq_chrom/{project_name}.{sex}.{chrom}.{pheno}.hsq",
+            "results/h2/h2sq_chrom/h2_est/{project_name}.{sex}.{chrom}.{pheno}.hsq",
             chrom=chroms,
             sex="Male",
             project_name=config["project_name"],
