@@ -660,6 +660,9 @@ rule estimate_per_chrom_sex_grm:
         chrom=lambda wildcards: f"{wildcards.chrom}"[3:],
         prefix=lambda wildcards: f"results/pgen_input/{wildcards.project_name}",
         outfix=lambda wildcards: f"results/h2/h2sq_chrom/grms/{wildcards.project_name}.{wildcards.sex}.{wildcards.chrom}",
+    resources:
+        time="4:00:00",
+        mem_mb="10G",
     threads: 8
     shell:
         """
@@ -680,6 +683,9 @@ rule create_gcta_pheno:
         pheno=temp(
             "results/h2/h2sq_chrom/pheno/{project_name}.{sex}.{chrom}.{pheno}.txt"
         ),
+    resources:
+        time="0:10:00",
+        mem_mb="2G",
     run:
         df = pd.read_csv(input.pheno, sep="\t")
         filt_df = df[["#FID", "IID", f"{wildcards.pheno}"]]
@@ -692,6 +698,9 @@ rule create_gcta_covar:
         covar="results/covariates/{project_name}.covars.plink2.txt",
     output:
         covar="results/h2/h2sq_chrom/covars/{project_name}.{sex}.{chrom}.{pheno}.covars.txt",
+    resources:
+        time="0:10:00",
+        mem_mb="2G",
     run:
         df = pd.read_csv(input.covar, sep="\t")
         assert "Sex" in df.columns
@@ -710,6 +719,9 @@ rule per_chrom_reml:
     params:
         grmfix=lambda wildcards: f"results/h2/h2sq_chrom/grms/{wildcards.project_name}.{wildcards.sex}.{wildcards.chrom}",
         outfix=lambda wildcards: f"results/h2/h2sq_chrom/{wildcards.project_name}.{wildcards.sex}.{wildcards.chrom}.{wildcards.pheno}",
+    resources:
+        time="2:00:00",
+        mem_mb="10G",
     threads: 8
     shell:
         """
