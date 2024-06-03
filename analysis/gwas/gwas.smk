@@ -653,48 +653,63 @@ rule estimate_per_chrom_sex_grm:
         pvar="results/pgen_input/{project_name}.pvar",
         excludes="results/covariates/{project_name}.{sex}.plink2.exclude.txt",
     output:
-        grm="results/h2/h2sq_chrom/grms/{project_name}.{chrom}.grm.bin",
-        grm_n="results/h2/h2sq_chrom/grms/{project_name}.{chrom}.grm.N.bin",
-        grm_id="results/h2/h2sq_chrom/grms/{project_name}.{chrom}.grm.N.id",   
+        grm="results/h2/h2sq_chrom/grms/{project_name}.{sex}.{chrom}.grm.bin",
+        grm_n="results/h2/h2sq_chrom/grms/{project_name}.{sex}.{chrom}.grm.N.bin",
+        grm_id="results/h2/h2sq_chrom/grms/{project_name}.{sex}.{chrom}.grm.id",
+    params:
+        chrom=lambda wildcards: f"{wildcards.chrom}"[3:],
+        prefix=lambda wildcards: f"results/pgen_input/{wildcards.project_name}",
+        outfix=lambda wildcards: f"results/h2/h2sq_chrom/grms/{wildcards.project_name}.{wildcards.sex}.{wildcards.chrom}",
     threads: 8
     shell:
         """
         gcta --pfile {params.prefix}\
-        --chr {wildcards.chrom}\
+        --chr {params.chrom}\
         --remove {input.excludes}\
         --make-grm\
         --out {params.outfix}\
         --threads {threads}
         """
 
+
 rule create_gcta_pheno:
     """Create phenotype file for use in GCTA."""
     input:
-        pheno = "results/phenotypes/{project_name}.{format}.pheno" 
+        pheno="results/phenotypes/{project_name}.plink2.pheno",
     output:
-        pheno = temp("results/h2/h2sq_chrom/pheno/{project_name}.{chrom}.{pheno}.txt") 
-    wildcard_constraints:
-        format="plink2"
+        pheno=temp(
+            "results/h2/h2sq_chrom/pheno/{project_name}.{sex}.{chrom}.{pheno}.txt"
+        ),
     run:
         df = pd.read_csv(input.pheno, sep="\t")
-        filt_df = df[['FID', 'IID', f'{wildcards.pheno}']]
-        filt_df.to_csv(output.pheno, sep='\t', index=None, header=None)
+        filt_df = df[["#FID", "IID", f"{wildcards.pheno}"]]
+        filt_df.to_csv(output.pheno, sep="\t", index=None, header=None)
+
 
 # Need a rule to create phenotypes for GCTA + covariates ...
 rule per_chrom_reml:
     input:
-        grm = "results/h2/h2sq_chrom/grms/{project_name}.{chrom}.grm.bin"
-        pheno = "results/h2/h2sq_chrom/pheno/{project_name}.{chrom}.{pheno}.txt"
-        covar = "results/covariates/{project_name}.covars.{format}.txt"
+        grm="results/h2/h2sq_chrom/grms/{project_name}.{sex}.{chrom}.grm.bin",
+        pheno="results/h2/h2sq_chrom/pheno/{project_name}.{sex}.{chrom}.{pheno}.txt",
+        covar="results/covariates/{project_name}.covars.plink2.txt",
     output:
-        hsq = "results/h2/h2sq_chrom/{project_name}.{chrom}.{pheno}.hsq"
-    wildcard_constraints:
-        format="plink2"
+        hsq="results/h2/h2sq_chrom/{project_name}.{sex}.{chrom}.{pheno}.hsq",
     params:
-        grmfix = lambda wildcards: f'results/h2/h2sq_chrom/grms/{wildcards.project_name}.{wildcards.chrom}.{wildcards.pheno}',
-        outfix = lambda wildcards: f'results/h2/h2sq_chrom/{wildcards.project_name}.{wildcards.chrom}.{wildcards.pheno}', 
+        grmfix=lambda wildcards: f"results/h2/h2sq_chrom/grms/{wildcards.project_name}.{wildcards.sex}.{wildcards.chrom}.{wildcards.pheno}",
+        outfix=lambda wildcards: f"results/h2/h2sq_chrom/{wildcards.project_name}.{wildcards.sex}.{wildcards.chrom}.{wildcards.pheno}",
     shell:
-        "gcta --reml --grm {params.grm_prefix} --pheno {input.pheno} --qcovar {input.covar} --out {params.outfix} --threads {threads}"
+        "gcta --reml --grm {params.grmfix} --pheno {input.pheno} --qcovar {input.covar} --out {params.outfix} --threads {threads}"
+
+
+rule test_per_chrom_h2:
+    input:
+        expand(
+            "results/h2/h2sq_chrom/{project_name}.{sex}.{chrom}.{pheno}.hsq",
+            chrom=chroms,
+            sex="Male",
+            project_name=config["project_name"],
+            pheno=["MeanCO"],
+        ),
 
 
 # -------- 6. Heritability Estimation using GREML-LDMS from imputed data -------- #
@@ -708,6 +723,7 @@ rule estimate_ld_scores:
     output:
         "results/h2/hsq_ldms/ld_score/{wildcards.project_name}.{chrom}.score.ld",
     params:
+        chrom=lambda wildcards: f"{wildcards.chrom}"[3:],
         ldscore_region=1000,
         pfile=lambda wildcards: f"results/pgen_input/{wildcards.project_name}",
         outfix=lambda wildcards: f"results/h2/hsq_ldms/ld_score/{wildcards.project_name}.{wildcards.chrom}",
@@ -715,7 +731,7 @@ rule estimate_ld_scores:
     shell:
         """
         gcta --pfile {params.pfile}\
-        --threads {threads} --chr {wildcards.chrom}\
+        --threads {threads} --chr {params.chrom}\
         --remove {input.king_excludes}\
         --ld-score-region {params.ldscore_region}\
         --out {params.outfix}
@@ -749,7 +765,7 @@ rule create_grms:
     output:
         grm="results/h2/h2sq_ldms/grms/{project_name}.ld_{p}.maf_{i}.grm.bin",
         grm_n="results/h2/h2sq_ldms/grms/{project_name}.ld_{p}.maf_{i}.grm.N.bin",
-        grm_id="results/h2/h2sq_ldms/grms/{project_name}.ld_{p}.maf_{i}.grm.N.id",
+        grm_id="results/h2/h2sq_ldms/grms/{project_name}.ld_{p}.maf_{i}.grm.id",
     params:
         outfix=lambda wildcards: f"results/h2/grms/{wildcards.project_name}.ld_{wildcards.p}.maf_{wildcards.i}",
     threads: 4
