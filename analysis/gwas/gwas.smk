@@ -646,13 +646,55 @@ rule combine_gwas_results:
 
 
 # -------- 5. Estimating per-chromosome h2 using GREML -------- #
-# rule estimate_per_chrom_grm:
-# input:
-# pgen="results/pgen_input/{project_name}.pgen",
-# psam="results/pgen_input/{project_name}.psam",
-# pvar="results/pgen_input/{project_name}.pvar",
-# king_excludes="results/covariates/{project_name}.king.cutoff.out.id",
-# output:
+rule estimate_per_chrom_sex_grm:
+    input:
+        pgen="results/pgen_input/{project_name}.pgen",
+        psam="results/pgen_input/{project_name}.psam",
+        pvar="results/pgen_input/{project_name}.pvar",
+        excludes="results/covariates/{project_name}.{sex}.plink2.exclude.txt",
+    output:
+        grm="results/h2/h2sq_chrom/grms/{project_name}.{chrom}.grm.bin",
+        grm_n="results/h2/h2sq_chrom/grms/{project_name}.{chrom}.grm.N.bin",
+        grm_id="results/h2/h2sq_chrom/grms/{project_name}.{chrom}.grm.N.id",   
+    threads: 8
+    shell:
+        """
+        gcta --pfile {params.prefix}\
+        --chr {wildcards.chrom}\
+        --remove {input.excludes}\
+        --make-grm\
+        --out {params.outfix}\
+        --threads {threads}
+        """
+
+rule create_gcta_pheno:
+    """Create phenotype file for use in GCTA."""
+    input:
+        pheno = "results/phenotypes/{project_name}.{format}.pheno" 
+    output:
+        pheno = temp("results/h2/h2sq_chrom/pheno/{project_name}.{chrom}.{pheno}.txt") 
+    wildcard_constraints:
+        format="plink2"
+    run:
+        df = pd.read_csv(input.pheno, sep="\t")
+        filt_df = df[['FID', 'IID', f'{wildcards.pheno}']]
+        filt_df.to_csv(output.pheno, sep='\t', index=None, header=None)
+
+# Need a rule to create phenotypes for GCTA + covariates ...
+rule per_chrom_reml:
+    input:
+        grm = "results/h2/h2sq_chrom/grms/{project_name}.{chrom}.grm.bin"
+        pheno = "results/h2/h2sq_chrom/pheno/{project_name}.{chrom}.{pheno}.txt"
+        covar = "results/covariates/{project_name}.covars.{format}.txt"
+    output:
+        hsq = "results/h2/h2sq_chrom/{project_name}.{chrom}.{pheno}.hsq"
+    wildcard_constraints:
+        format="plink2"
+    params:
+        grmfix = lambda wildcards: f'results/h2/h2sq_chrom/grms/{wildcards.project_name}.{wildcards.chrom}.{wildcards.pheno}',
+        outfix = lambda wildcards: f'results/h2/h2sq_chrom/{wildcards.project_name}.{wildcards.chrom}.{wildcards.pheno}', 
+    shell:
+        "gcta --reml --grm {params.grm_prefix} --pheno {input.pheno} --qcovar {input.covar} --out {params.outfix} --threads {threads}"
 
 
 # -------- 6. Heritability Estimation using GREML-LDMS from imputed data -------- #
