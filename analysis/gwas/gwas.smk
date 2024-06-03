@@ -559,7 +559,7 @@ rule combine_gwas_effect_size_afreq:
                 "Gencode",
                 "Dist",
             ]
-        df["PHENO"] = f"{pheno}_{sex}"
+            df["PHENO"] = f"{pheno}_{sex}"
         freq_df = pd.read_csv(input.freqs, sep="\t")
         freq_df.rename(columns={"#CHROM": "CHROM"}, inplace=True)
         beta_df = pd.read_csv(input.top_variants, sep="\t")
@@ -722,7 +722,7 @@ rule per_chrom_reml:
     resources:
         time="2:00:00",
         mem_mb="10G",
-    threads: 8
+    threads: 4
     shell:
         """
         gcta --reml --grm {params.grmfix}\
@@ -731,13 +731,34 @@ rule per_chrom_reml:
         """
 
 
+rule collapse_per_chrom_h2:
+    """Collapse the per-chromosome estimates for h2."""
+    input:
+        hsq_files=expand(
+            "results/h2/h2sq_chrom/h2_est/{{project_name}}.{{sex}}.{chrom}.{{pheno}}.hsq",
+            chrom=chroms,
+        ),
+    output:
+        h2sq_tsv="results/h2/h2sq_chrom/h2_est_total/{project_name}.{sex}.{pheno}.hsq",
+    run:
+        dfs = []
+        for fp in input.hsq_files:
+            chrom = fp.split(".")[2]
+            df = pd.read_csv(fp, nrows=4, sep="\t")
+            df["chrom"] = chrom
+            df["sex"] = f"{wildcards.sex}"
+            df["pheno"] = f"{wildcards.pheno}"
+            dfs.append(df)
+        tot_df = pd.concat(dfs)
+        tot_df.to_csv(output.h2sq_tsv, index=None, sep="\t")
+
+
 rule test_per_chrom_h2:
     input:
         expand(
-            "results/h2/h2sq_chrom/h2_est/{project_name}.{sex}.{chrom}.{pheno}.hsq",
-            chrom=chroms,
-            sex="Male",
+            "results/h2/h2sq_chrom/h2_est_total/{project_name}.{sex}.{pheno}.hsq",
             project_name=config["project_name"],
+            sex=["Male"],
             pheno=["MeanCO"],
         ),
 
