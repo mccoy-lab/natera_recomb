@@ -14,3 +14,6 @@ datadir: "/data/rmccoy22/natera_spectrum/genotypes/imputed_parents_101823_cpra/"
 methods:
   - "plink2"
   - "regenie"
+h2:
+  maf_bins: 4
+  ld_bins: 4
