@@ -780,10 +780,10 @@ rule estimate_ld_scores:
         pvar="results/pgen_input/{project_name}.pvar",
         king_excludes="results/covariates/{project_name}.king.cutoff.out.id",
     output:
-        bed = temp("results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.bed"), 
-        bim = temp("results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.bim"),
-        fam = temp("results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.fam"),
-        ldscore = "results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.score.ld",
+        bed=temp("results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.bed"),
+        bim=temp("results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.bim"),
+        fam=temp("results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.fam"),
+        ldscore="results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.score.ld",
     params:
         chrom=lambda wildcards: f"{wildcards.chrom}"[3:],
         ldscore_region=1000,
@@ -801,13 +801,6 @@ rule estimate_ld_scores:
         --out {params.outfix}
         """
 
-rule test_ldscores:
-    input:
-        expand(
-            "results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.score.ld",
-            chrom=[f"chr{i}" for i in range(1, 23)],
-            project_name=config['project_name']
-        ),
 
 rule partition_ld_scores:
     """Partition LD scores into multiple components."""
@@ -817,12 +810,23 @@ rule partition_ld_scores:
             chrom=[f"chr{i}" for i in range(1, 23)],
         ),
     output:
-        "results/h2/hsq_ldms/ld_score/{project_name}.ld_{p}.maf_{i}.txt",
+        ld_maf_partition="results/h2/hsq_ldms/ld_score/{project_name}.ld_{p}.maf_{i}.txt",
     params:
-        partitions=config["h2"]["ld_bins"],
-        maf_bins=[0.0, 0.01, 0.05, 0.1, 1.0],
+        nld_bins=config["h2"]["ld_bins"],
+        nmaf_bins=config["h2"]["maf_bins"],
+        maf_bins=[0.0, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5],
     script:
         "scripts/partition_ld_scores.py"
+
+
+rule test_ldscore_partition:
+    input:
+        expand(
+            "results/h2/hsq_ldms/ld_score/{project_name}.ld_{p}.maf_{i}.txt",
+            project_name=config["project_name"],
+            p=range(config["h2"]["ld_bins"]),
+            i=range(config["h2"]["maf_bins"]),
+        ),
 
 
 rule create_grms:

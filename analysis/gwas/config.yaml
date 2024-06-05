@@ -15,5 +15,5 @@ methods:
   - "plink2"
   - "regenie"
 h2:
-  maf_bins: 4
+  maf_bins: 6
   ld_bins: 4
