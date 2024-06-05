@@ -790,6 +790,9 @@ rule estimate_ld_scores:
         pfile=lambda wildcards: f"results/pgen_input/{wildcards.project_name}",
         outbfix=lambda wildcards: f"results/h2/h2sq_ldms/ld_score/{wildcards.project_name}.{wildcards.chrom}",
         outfix=lambda wildcards: f"results/h2/h2sq_ldms/ld_score/{wildcards.project_name}.{wildcards.chrom}",
+    resources:
+        time="4:00:00",
+        mem_mb="10G",
     threads: 8
     shell:
         """
@@ -811,6 +814,9 @@ rule partition_ld_scores:
         ),
     output:
         ld_maf_partition="results/h2/h2sq_ldms/ld_score/{project_name}.ld_{p}.maf_{i}.txt",
+    resources:
+        time="1:00:00",
+        mem_mb="4G",
     params:
         nld_bins=config["h2"]["ld_bins"],
         nmaf_bins=config["h2"]["maf_bins"],
@@ -834,6 +840,9 @@ rule create_grms:
     params:
         pfile = lambda wildcards: f"results/pgen_input/{wildcards.project_name}",
         outfix=lambda wildcards: f"results/h2/h2sq_ldms/grms/{wildcards.project_name}.{wildcards.sex}.ld_{wildcards.p}.maf_{wildcards.i}",
+    resources:
+        time="4:00:00",
+        mem_mb="10G",
     threads: 4
     shell:
         """
@@ -861,6 +870,9 @@ rule estimate_h2_ldms:
         hsq="results/h2/h2sq_ldms/{project_name}.{sex}.{pheno}.hsq",
     params:
         outfix=lambda wildcards: f"results/h2/h2sq_ldms/{wildcards.project_name}.{wildcards.sex}.{wildcards.pheno}",
+    resources:
+        time="4:00:00",
+        mem_mb="10G",
     threads: 8
     shell:
         """
