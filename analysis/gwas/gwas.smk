@@ -780,16 +780,16 @@ rule estimate_ld_scores:
         pvar="results/pgen_input/{project_name}.pvar",
         king_excludes="results/covariates/{project_name}.king.cutoff.out.id",
     output:
-        bed=temp("results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.bed"),
-        bim=temp("results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.bim"),
-        fam=temp("results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.fam"),
-        ldscore="results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.score.ld",
+        bed=temp("results/h2/h2sq_ldms/ld_score/{project_name}.{chrom}.bed"),
+        bim=temp("results/h2/h2sq_ldms/ld_score/{project_name}.{chrom}.bim"),
+        fam=temp("results/h2/h2sq_ldms/ld_score/{project_name}.{chrom}.fam"),
+        ldscore="results/h2/h2sq_ldms/ld_score/{project_name}.{chrom}.score.ld",
     params:
         chrom=lambda wildcards: f"{wildcards.chrom}"[3:],
         ldscore_region=1000,
         pfile=lambda wildcards: f"results/pgen_input/{wildcards.project_name}",
-        outbfix=lambda wildcards: f"results/h2/hsq_ldms/ld_score/{wildcards.project_name}.{wildcards.chrom}",
-        outfix=lambda wildcards: f"results/h2/hsq_ldms/ld_score/{wildcards.project_name}.{wildcards.chrom}",
+        outbfix=lambda wildcards: f"results/h2/h2sq_ldms/ld_score/{wildcards.project_name}.{wildcards.chrom}",
+        outfix=lambda wildcards: f"results/h2/h2sq_ldms/ld_score/{wildcards.project_name}.{wildcards.chrom}",
     threads: 8
     shell:
         """
@@ -806,11 +806,11 @@ rule partition_ld_scores:
     """Partition LD scores into multiple components."""
     input:
         expand(
-            "results/h2/hsq_ldms/ld_score/{{project_name}}.{chrom}.score.ld",
+            "results/h2/h2sq_ldms/ld_score/{{project_name}}.{chrom}.score.ld",
             chrom=[f"chr{i}" for i in range(1, 23)],
         ),
     output:
-        ld_maf_partition="results/h2/hsq_ldms/ld_score/{project_name}.ld_{p}.maf_{i}.txt",
+        ld_maf_partition="results/h2/h2sq_ldms/ld_score/{project_name}.ld_{p}.maf_{i}.txt",
     params:
         nld_bins=config["h2"]["ld_bins"],
         nmaf_bins=config["h2"]["maf_bins"],
@@ -819,36 +819,27 @@ rule partition_ld_scores:
         "scripts/partition_ld_scores.py"
 
 
-rule test_ldscore_partition:
-    input:
-        expand(
-            "results/h2/hsq_ldms/ld_score/{project_name}.ld_{p}.maf_{i}.txt",
-            project_name=config["project_name"],
-            p=range(config["h2"]["ld_bins"]),
-            i=range(config["h2"]["maf_bins"]),
-        ),
-
-
 rule create_grms:
     """Create a LD + MAF stratified GRM for estimation of effects."""
     input:
         pgen="results/pgen_input/{project_name}.pgen",
         psam="results/pgen_input/{project_name}.psam",
         pvar="results/pgen_input/{project_name}.pvar",
-        king_excludes="results/covariates/{project_name}.king.cutoff.out.id",
+        excludes="results/covariates/{project_name}.{sex}.plink2.exclude.txt",
         ldms_snps="results/h2/h2sq_ldms/ld_score/{project_name}.ld_{p}.maf_{i}.txt",
     output:
-        grm="results/h2/h2sq_ldms/grms/{project_name}.ld_{p}.maf_{i}.grm.bin",
-        grm_n="results/h2/h2sq_ldms/grms/{project_name}.ld_{p}.maf_{i}.grm.N.bin",
-        grm_id="results/h2/h2sq_ldms/grms/{project_name}.ld_{p}.maf_{i}.grm.id",
+        grm="results/h2/h2sq_ldms/grms/{project_name}.{sex}.ld_{p}.maf_{i}.grm.bin",
+        grm_n="results/h2/h2sq_ldms/grms/{project_name}.{sex}.ld_{p}.maf_{i}.grm.N.bin",
+        grm_id="results/h2/h2sq_ldms/grms/{project_name}.{sex}.ld_{p}.maf_{i}.grm.id",
     params:
-        outfix=lambda wildcards: f"results/h2/grms/{wildcards.project_name}.ld_{wildcards.p}.maf_{wildcards.i}",
+        pfile = lambda wildcards: f"results/pgen_input/{wildcards.project_name}",
+        outfix=lambda wildcards: f"results/h2/h2sq_ldms/grms/{wildcards.project_name}.{wildcards.sex}.ld_{wildcards.p}.maf_{wildcards.i}",
     threads: 4
     shell:
         """
         gcta --pfile {params.pfile}\
         --threads {threads}\
-        --remove {input.king_excludes}\
+        --remove {input.excludes}\
         --extract {input.ldms_snps}\
         --make-grm\
         --out {params.outfix}
@@ -859,18 +850,30 @@ rule estimate_h2_ldms:
     """Estimate h2snp stratified by LD + MAF."""
     input:
         grms=expand(
-            "results/h2/h2sq_ldms/grms/{{project_name}}.ld_{p}.maf_{i}.grm.bin",
+            "results/h2/h2sq_ldms/grms/{{project_name}}.{{sex}}.ld_{p}.maf_{i}.grm.bin",
             p=range(config["h2"]["ld_bins"]),
             i=range(config["h2"]["maf_bins"]),
         ),
+        pheno="results/h2/h2sq_chrom/pheno/{project_name}.{sex}.chr1.{pheno}.txt",
+        covar="results/h2/h2sq_chrom/covars/{project_name}.{sex}.chr1.{pheno}.covars.txt",
     output:
-        mgrms=temp("results/h2sq_ldms/{project_name}.{pheno}.mgrms"),
-        hsq="results/h2/h2sq_ldms/{project_name}.{pheno}.hsq",
+        mgrms=temp("results/h2sq_ldms/{project_name}.{sex}.{pheno}.mgrms"),
+        hsq="results/h2/h2sq_ldms/{project_name}.{sex}.{pheno}.hsq",
     params:
-        outfix=lambda wildcards: f"results/h2/h2sq_ldms/{wildcards.project_name}.{wildcards.pheno}",
+        outfix=lambda wildcards: f"results/h2/h2sq_ldms/{wildcards.project_name}.{wildcards.sex}.{wildcards.pheno}",
     threads: 8
     shell:
         """
         ls {input.grms} > {output.mgrms}
-        gcta --reml --mgrm {output.mgrms} --pheno {input.pheno} --out {params.outfix} --threads {threads}
+        gcta --reml --mgrm {output.mgrms} --pheno {input.pheno} --qcovar {input.covar} --out {params.outfix} --threads {threads}
         """
+
+
+rule test_greml_ldms:
+    input:
+        expand(
+            "results/h2/h2sq_ldms/{project_name}.{sex}.{pheno}.hsq",
+            project_name=config["project_name"],
+            sex="Male",
+            pheno=["MeanCO"],
+        ),
