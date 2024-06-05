@@ -792,7 +792,7 @@ rule estimate_ld_scores:
         outfix=lambda wildcards: f"results/h2/h2sq_ldms/ld_score/{wildcards.project_name}.{wildcards.chrom}",
     resources:
         time="4:00:00",
-        mem_mb="10G",
+        mem_mb="20G",
     threads: 8
     shell:
         """
@@ -842,7 +842,7 @@ rule create_grms:
         outfix=lambda wildcards: f"results/h2/h2sq_ldms/grms/{wildcards.project_name}.{wildcards.sex}.ld_{wildcards.p}.maf_{wildcards.i}",
     resources:
         time="4:00:00",
-        mem_mb="10G",
+        mem_mb="20G",
     threads: 4
     shell:
         """
