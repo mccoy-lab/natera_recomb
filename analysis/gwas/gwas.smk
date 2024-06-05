@@ -35,6 +35,10 @@ rule all:
             format="plink2",
             project_name=config["project_name"],
         ),
+        expand(
+            "results/h2/h2sq_chrom/h2_est_total/{project_name}.total.hsq",
+            project_name=config["project_name"],
+        ),
 
 
 # ------- 0. Preprocess Genetic data ------- #
@@ -559,7 +563,7 @@ rule combine_gwas_effect_size_afreq:
                 "Gencode",
                 "Dist",
             ]
-            df["PHENO"] = f"{pheno}_{sex}"
+        df["PHENO"] = f"{pheno}_{sex}"
         freq_df = pd.read_csv(input.freqs, sep="\t")
         freq_df.rename(columns={"#CHROM": "CHROM"}, inplace=True)
         beta_df = pd.read_csv(input.top_variants, sep="\t")
@@ -753,14 +757,18 @@ rule collapse_per_chrom_h2:
         tot_df.to_csv(output.h2sq_tsv, index=None, sep="\t")
 
 
-rule test_per_chrom_h2:
+rule aggregate_per_chrom_h2_multitrait:
     input:
-        expand(
-            "results/h2/h2sq_chrom/h2_est_total/{project_name}.{sex}.{pheno}.hsq",
-            project_name=config["project_name"],
-            sex=["Male"],
-            pheno=["MeanCO"],
+        hsq_files=expand(
+            "results/h2/h2sq_chrom/h2_est_total/{{project_name}}.{sex}.{pheno}.hsq",
+            sex=["Male", "Female"],
+            pheno=["MeanCO", "CentromereDist", "TelomereDist", "HotspotOccupancy"],
         ),
+    output:
+        tot_hsq="results/h2/h2sq_chrom/h2_est_total/{project_name}.total.hsq",
+    run:
+        tot_df = pd.concat([pd.read_csv(fp, sep="\t") for fp in input.hsq_files])
+        tot_df.to_csv(output.tot_hsq, sep="\t", index=None)
 
 
 # -------- 6. Heritability Estimation using GREML-LDMS from imputed data -------- #
@@ -772,28 +780,40 @@ rule estimate_ld_scores:
         pvar="results/pgen_input/{project_name}.pvar",
         king_excludes="results/covariates/{project_name}.king.cutoff.out.id",
     output:
-        "results/h2/hsq_ldms/ld_score/{wildcards.project_name}.{chrom}.score.ld",
+        bed = temp("results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.bed"), 
+        bim = temp("results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.bim"),
+        fam = temp("results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.fam"),
+        ldscore = "results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.score.ld",
     params:
         chrom=lambda wildcards: f"{wildcards.chrom}"[3:],
         ldscore_region=1000,
         pfile=lambda wildcards: f"results/pgen_input/{wildcards.project_name}",
+        outbfix=lambda wildcards: f"results/h2/hsq_ldms/ld_score/{wildcards.project_name}.{wildcards.chrom}",
         outfix=lambda wildcards: f"results/h2/hsq_ldms/ld_score/{wildcards.project_name}.{wildcards.chrom}",
     threads: 8
     shell:
         """
-        gcta --pfile {params.pfile}\
+        plink2 --pfile {params.pfile} --chr {params.chrom} --make-bed --out {params.outbfix}
+        gcta --bfile {params.outbfix}\
         --threads {threads} --chr {params.chrom}\
         --remove {input.king_excludes}\
         --ld-score-region {params.ldscore_region}\
         --out {params.outfix}
         """
 
+rule test_ldscores:
+    input:
+        expand(
+            "results/h2/hsq_ldms/ld_score/{project_name}.{chrom}.score.ld",
+            chrom=[f"chr{i}" for i in range(1, 23)],
+            project_name=config['project_name']
+        ),
 
 rule partition_ld_scores:
     """Partition LD scores into multiple components."""
     input:
         expand(
-            "results/h2//hsq_ldms/ld_score/{{project_name}}.{chrom}.score.ld",
+            "results/h2/hsq_ldms/ld_score/{{project_name}}.{chrom}.score.ld",
             chrom=[f"chr{i}" for i in range(1, 23)],
         ),
     output:
