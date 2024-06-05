@@ -876,7 +876,7 @@ rule estimate_h2_ldms:
     threads: 8
     shell:
         """
-        ls {input.grms} > {output.mgrms}
+        ls {input.grms} | sed 's/\.grm.*//' > {output.mgrms}
         gcta --reml --mgrm {output.mgrms} --pheno {input.pheno} --qcovar {input.covar} --out {params.outfix} --threads {threads}
         """
 
