@@ -36,8 +36,9 @@ rule all:
             project_name=config["project_name"],
         ),
         expand(
-            "results/h2/h2sq_chrom/h2_est_total/{project_name}.total.hsq",
+            "results/h2/h2sq_{mode}/h2_est_total/{project_name}.total.hsq",
             project_name=config["project_name"],
+            mode=["chrom", "ldms"],
         ),
 
 
@@ -563,7 +564,7 @@ rule combine_gwas_effect_size_afreq:
                 "Gencode",
                 "Dist",
             ]
-        df["PHENO"] = f"{pheno}_{sex}"
+            df["PHENO"] = f"{pheno}_{sex}"
         freq_df = pd.read_csv(input.freqs, sep="\t")
         freq_df.rename(columns={"#CHROM": "CHROM"}, inplace=True)
         beta_df = pd.read_csv(input.top_variants, sep="\t")
@@ -838,7 +839,7 @@ rule create_grms:
         grm_n="results/h2/h2sq_ldms/grms/{project_name}.{sex}.ld_{p}.maf_{i}.grm.N.bin",
         grm_id="results/h2/h2sq_ldms/grms/{project_name}.{sex}.ld_{p}.maf_{i}.grm.id",
     params:
-        pfile = lambda wildcards: f"results/pgen_input/{wildcards.project_name}",
+        pfile=lambda wildcards: f"results/pgen_input/{wildcards.project_name}",
         outfix=lambda wildcards: f"results/h2/h2sq_ldms/grms/{wildcards.project_name}.{wildcards.sex}.ld_{wildcards.p}.maf_{wildcards.i}",
     resources:
         time="4:00:00",
@@ -866,10 +867,10 @@ rule estimate_h2_ldms:
         pheno="results/h2/h2sq_chrom/pheno/{project_name}.{sex}.chr1.{pheno}.txt",
         covar="results/h2/h2sq_chrom/covars/{project_name}.{sex}.chr1.{pheno}.covars.txt",
     output:
-        mgrms=temp("results/h2sq_ldms/{project_name}.{sex}.{pheno}.mgrms"),
-        hsq="results/h2/h2sq_ldms/{project_name}.{sex}.{pheno}.hsq",
+        mgrms=temp("results/h2sq_ldms/h2_est/{project_name}.{sex}.{pheno}.mgrms"),
+        hsq="results/h2/h2sq_ldms/h2_est/{project_name}.{sex}.{pheno}.hsq",
     params:
-        outfix=lambda wildcards: f"results/h2/h2sq_ldms/{wildcards.project_name}.{wildcards.sex}.{wildcards.pheno}",
+        outfix=lambda wildcards: f"results/h2/h2sq_ldms/h2_est/{wildcards.project_name}.{wildcards.sex}.{wildcards.pheno}",
     resources:
         time="4:00:00",
         mem_mb="10G",
@@ -881,11 +882,29 @@ rule estimate_h2_ldms:
         """
 
 
-rule test_greml_ldms:
+rule collapse_per_chrom_h2_ldms:
+    """Collapse the estimates for h2."""
     input:
-        expand(
-            "results/h2/h2sq_ldms/{project_name}.{sex}.{pheno}.hsq",
-            project_name=config["project_name"],
-            sex="Male",
-            pheno=["MeanCO"],
+        hsq="results/h2/h2sq_ldms/h2_est/{project_name}.{sex}.{pheno}.hsq",
+    output:
+        h2sq_tsv="results/h2/h2sq_ldms/h2_est_total/{project_name}.{sex}.{pheno}.hsq",
+    run:
+        df = pd.read_csv(snakemake.input["hsq"], sep="\t", on_bad_lines="skip")
+        df["sex"] = f"{wildcards.sex}"
+        df["pheno"] = f"{wildcards.pheno}"
+        df.to_csv(output.h2sq_tsv, index=None, sep="\t")
+
+
+rule aggregate_h2_ldms:
+    """Final aggregation rule for estimating h2 in GREML-LDMS."""
+    input:
+        hsq_files=expand(
+            "results/h2/h2sq_ldms/h2_est_total/{{project_name}}.{sex}.{pheno}.hsq",
+            sex=["Male", "Female"],
+            pheno=["MeanCO", "CentromereDist", "TelomereDist", "HotspotOccupancy"],
         ),
+    output:
+        tot_hsq="results/h2/h2sq_ldms/h2_est_total/{project_name}.total.hsq",
+    run:
+        tot_df = pd.concat([pd.read_csv(fp, sep="\t") for fp in input.hsq_files])
+        tot_df.to_csv(output.tot_hsq, sep="\t", index=None)
