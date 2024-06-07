@@ -1,6 +1,7 @@
 #!python3
 import numpy as np
 import pandas as pd
+import polars as pl
 
 import pickle, gzip
 from tqdm import tqdm
@@ -21,11 +22,11 @@ rule all:
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
         ),
-        expand(
-            "results/statistical_models/{name}.{recmap}.aneuploidy_effect_per_chrom.mean.tsv",
-            name=config["crossover_data"].keys(),
-            recmap=config["recomb_maps"].keys(),
-        ),
+        # expand(
+        #     "results/statistical_models/{name}.{recmap}.aneuploidy_effect_per_chrom.mean.tsv",
+        #     name=config["crossover_data"].keys(),
+        #     recmap=config["recomb_maps"].keys(),
+        # ),
 
 
 # ---------------- Analysis 1a. Conduct preprocessing analyses. -------- #
@@ -38,19 +39,29 @@ rule filter_co_dataset:
     params:
         qual_thresh=0.95,
     run:
-        import pandas as pd
-
-        co_df = pd.read_csv(input.crossover_data, sep="\t")
-        co_df["uid"] = co_df["mother"].str.cat(co_df[["father", "child"]], sep="+")
-        co_df["valid_co"] = ~co_df.duplicated(
-            ["uid", "chrom", "crossover_sex", "min_pos", "max_pos"], keep=False
+        co_df = pl.read_csv(input.crossover_data, separator="\t")
+        co_df = co_df.with_columns(
+            pl.concat_str(
+                [
+                    pl.col("mother"),
+                    pl.col("father"),
+                    pl.col("child"),
+                ],
+                separator="+",
+            ).alias("uid"),
         )
-        co_df["qual_score"] = (co_df["min_pos_qual"] + co_df["max_pos_qual"]) / 2.0
-        co_df["frac_siblings"] = co_df["nsib_support"] / (co_df["nsibs"] - 1)
-        valid_co_df = co_df[
-            co_df["valid_co"] & (co_df["qual_score"] >= params.qual_thresh)
-        ]
-        valid_co_df.to_csv(output.co_filt_data, sep="\t", index=None)
+        co_df = co_df.with_columns(
+            ((pl.col("min_pos_qual") + pl.col("max_pos_qual")) / 2).alias("qual_score"),
+            (pl.col("nsib_support") / (pl.col("nsibs") - 1)).alias("frac_siblings"),
+            pl.struct("uid", "chrom", "crossover_sex", "min_pos", "max_pos")
+            .is_first_distinct()
+            .alias("valid_co"),
+        )
+        valid_co_df = co_df.filter(
+            pl.col("valid_co") & (pl.col("qual_score") > params.qual_thresh)
+        )
+        with gzip.open(output.co_filt_data, "wb") as f:
+            valid_co_df.write_csv(f, separator="\t")
 
 
 rule isolate_euploid_crossovers:
@@ -61,6 +72,7 @@ rule isolate_euploid_crossovers:
     output:
         co_euploid_filt_tsv="results/{name}.crossover_filt.euploid_only.tsv.gz",
         co_aneuploid_filt_tsv="results/{name}.crossover_filt.aneuploid_only.tsv.gz",
+        co_full_filt_tsv="results/{name}.crossover_filt.raw.tsv.gz",
     params:
         ppThresh=0.90,
     script:
@@ -131,8 +143,6 @@ rule merge_euploid_aneuploid:
     run:
         euploid_df = pd.read_csv(input.euploid_tsv, sep="\t")
         aneuploid_df = pd.read_csv(input.aneuploid_tsv, sep="\t")
-        euploid_df["aneuploid"] = False
-        aneuploid_df["aneuploid"] = True
         merged_df = pd.concat([euploid_df, aneuploid_df])
         merged_df.to_csv(output.merged_tsv, sep="\t", index=None)
 

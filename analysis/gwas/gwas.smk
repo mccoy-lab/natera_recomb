@@ -35,6 +35,11 @@ rule all:
             format="plink2",
             project_name=config["project_name"],
         ),
+        expand(
+            "results/h2/h2sq_{mode}/h2_est_total/{project_name}.total.hsq",
+            project_name=config["project_name"],
+            mode=["chrom", "ldms"],
+        ),
 
 
 # ------- 0. Preprocess Genetic data ------- #
@@ -559,7 +564,7 @@ rule combine_gwas_effect_size_afreq:
                 "Gencode",
                 "Dist",
             ]
-        df["PHENO"] = f"{pheno}_{sex}"
+            df["PHENO"] = f"{pheno}_{sex}"
         freq_df = pd.read_csv(input.freqs, sep="\t")
         freq_df.rename(columns={"#CHROM": "CHROM"}, inplace=True)
         beta_df = pd.read_csv(input.top_variants, sep="\t")
@@ -643,3 +648,263 @@ rule combine_gwas_results:
             tot_dfs.append(df)
         final_df = pd.concat(tot_dfs)
         final_df.to_csv(output.sumstats_final, sep="\t", index=None)
+
+
+# -------- 5. Estimating per-chromosome h2 using GREML -------- #
+rule estimate_per_chrom_sex_grm:
+    input:
+        pgen="results/pgen_input/{project_name}.pgen",
+        psam="results/pgen_input/{project_name}.psam",
+        pvar="results/pgen_input/{project_name}.pvar",
+        excludes="results/covariates/{project_name}.{sex}.plink2.exclude.txt",
+    output:
+        grm="results/h2/h2sq_chrom/grms/{project_name}.{sex}.{chrom}.grm.bin",
+        grm_n="results/h2/h2sq_chrom/grms/{project_name}.{sex}.{chrom}.grm.N.bin",
+        grm_id="results/h2/h2sq_chrom/grms/{project_name}.{sex}.{chrom}.grm.id",
+    params:
+        chrom=lambda wildcards: f"{wildcards.chrom}"[3:],
+        prefix=lambda wildcards: f"results/pgen_input/{wildcards.project_name}",
+        outfix=lambda wildcards: f"results/h2/h2sq_chrom/grms/{wildcards.project_name}.{wildcards.sex}.{wildcards.chrom}",
+    resources:
+        time="4:00:00",
+        mem_mb="10G",
+    threads: 8
+    shell:
+        """
+        gcta --pfile {params.prefix}\
+        --chr {params.chrom}\
+        --remove {input.excludes}\
+        --make-grm\
+        --out {params.outfix}\
+        --threads {threads}
+        """
+
+
+rule create_gcta_pheno:
+    """Create phenotype file for use in GCTA."""
+    input:
+        pheno="results/phenotypes/{project_name}.plink2.pheno",
+    output:
+        pheno=temp(
+            "results/h2/h2sq_chrom/pheno/{project_name}.{sex}.{chrom}.{pheno}.txt"
+        ),
+    resources:
+        time="0:10:00",
+        mem_mb="2G",
+    run:
+        df = pd.read_csv(input.pheno, sep="\t")
+        filt_df = df[["#FID", "IID", f"{wildcards.pheno}"]]
+        filt_df.to_csv(output.pheno, sep="\t", na_rep="NA", index=None, header=None)
+
+
+rule create_gcta_covar:
+    """Create a GCTA-structured covariate file."""
+    input:
+        covar="results/covariates/{project_name}.covars.plink2.txt",
+    output:
+        covar="results/h2/h2sq_chrom/covars/{project_name}.{sex}.{chrom}.{pheno}.covars.txt",
+    resources:
+        time="0:10:00",
+        mem_mb="2G",
+    run:
+        df = pd.read_csv(input.covar, sep="\t")
+        assert "Sex" in df.columns
+        df.drop(["Sex"], axis=1, inplace=True)
+        df.to_csv(output.covar, sep="\t", na_rep="NA", index=None)
+
+
+# Need a rule to create phenotypes for GCTA + covariates ...
+rule per_chrom_reml:
+    input:
+        grm="results/h2/h2sq_chrom/grms/{project_name}.{sex}.{chrom}.grm.bin",
+        pheno="results/h2/h2sq_chrom/pheno/{project_name}.{sex}.{chrom}.{pheno}.txt",
+        covar="results/h2/h2sq_chrom/covars/{project_name}.{sex}.{chrom}.{pheno}.covars.txt",
+    output:
+        hsq="results/h2/h2sq_chrom/h2_est/{project_name}.{sex}.{chrom}.{pheno}.hsq",
+    params:
+        grmfix=lambda wildcards: f"results/h2/h2sq_chrom/grms/{wildcards.project_name}.{wildcards.sex}.{wildcards.chrom}",
+        outfix=lambda wildcards: f"results/h2/h2sq_chrom/h2_est/{wildcards.project_name}.{wildcards.sex}.{wildcards.chrom}.{wildcards.pheno}",
+    resources:
+        time="2:00:00",
+        mem_mb="10G",
+    threads: 4
+    shell:
+        """
+        gcta --reml --grm {params.grmfix}\
+        --pheno {input.pheno} --qcovar {input.covar}\
+        --out {params.outfix} --threads {threads}
+        """
+
+
+rule collapse_per_chrom_h2:
+    """Collapse the per-chromosome estimates for h2."""
+    input:
+        hsq_files=expand(
+            "results/h2/h2sq_chrom/h2_est/{{project_name}}.{{sex}}.{chrom}.{{pheno}}.hsq",
+            chrom=chroms,
+        ),
+    output:
+        h2sq_tsv="results/h2/h2sq_chrom/h2_est_total/{project_name}.{sex}.{pheno}.hsq",
+    run:
+        dfs = []
+        for fp in input.hsq_files:
+            chrom = fp.split(".")[2]
+            df = pd.read_csv(fp, nrows=4, sep="\t")
+            df["chrom"] = chrom
+            df["sex"] = f"{wildcards.sex}"
+            df["pheno"] = f"{wildcards.pheno}"
+            dfs.append(df)
+        tot_df = pd.concat(dfs)
+        tot_df.to_csv(output.h2sq_tsv, index=None, sep="\t")
+
+
+rule aggregate_per_chrom_h2_multitrait:
+    input:
+        hsq_files=expand(
+            "results/h2/h2sq_chrom/h2_est_total/{{project_name}}.{sex}.{pheno}.hsq",
+            sex=["Male", "Female"],
+            pheno=["MeanCO", "CentromereDist", "TelomereDist", "HotspotOccupancy"],
+        ),
+    output:
+        tot_hsq="results/h2/h2sq_chrom/h2_est_total/{project_name}.total.hsq",
+    run:
+        tot_df = pd.concat([pd.read_csv(fp, sep="\t") for fp in input.hsq_files])
+        tot_df.to_csv(output.tot_hsq, sep="\t", index=None)
+
+
+# -------- 6. Heritability Estimation using GREML-LDMS from imputed data -------- #
+rule estimate_ld_scores:
+    """Estimate the LD-scores per-variant using GCTA."""
+    input:
+        pgen="results/pgen_input/{project_name}.pgen",
+        psam="results/pgen_input/{project_name}.psam",
+        pvar="results/pgen_input/{project_name}.pvar",
+        king_excludes="results/covariates/{project_name}.king.cutoff.out.id",
+    output:
+        bed=temp("results/h2/h2sq_ldms/ld_score/{project_name}.{chrom}.bed"),
+        bim=temp("results/h2/h2sq_ldms/ld_score/{project_name}.{chrom}.bim"),
+        fam=temp("results/h2/h2sq_ldms/ld_score/{project_name}.{chrom}.fam"),
+        ldscore="results/h2/h2sq_ldms/ld_score/{project_name}.{chrom}.score.ld",
+    params:
+        chrom=lambda wildcards: f"{wildcards.chrom}"[3:],
+        ldscore_region=1000,
+        pfile=lambda wildcards: f"results/pgen_input/{wildcards.project_name}",
+        outbfix=lambda wildcards: f"results/h2/h2sq_ldms/ld_score/{wildcards.project_name}.{wildcards.chrom}",
+        outfix=lambda wildcards: f"results/h2/h2sq_ldms/ld_score/{wildcards.project_name}.{wildcards.chrom}",
+    resources:
+        time="4:00:00",
+        mem_mb="20G",
+    threads: 8
+    shell:
+        """
+        plink2 --pfile {params.pfile} --chr {params.chrom} --make-bed --out {params.outbfix}
+        gcta --bfile {params.outbfix}\
+        --threads {threads} --chr {params.chrom}\
+        --remove {input.king_excludes}\
+        --ld-score-region {params.ldscore_region}\
+        --out {params.outfix}
+        """
+
+
+rule partition_ld_scores:
+    """Partition LD scores into multiple components."""
+    input:
+        expand(
+            "results/h2/h2sq_ldms/ld_score/{{project_name}}.{chrom}.score.ld",
+            chrom=[f"chr{i}" for i in range(1, 23)],
+        ),
+    output:
+        ld_maf_partition="results/h2/h2sq_ldms/ld_score/{project_name}.ld_{p}.maf_{i}.txt",
+    resources:
+        time="1:00:00",
+        mem_mb="4G",
+    params:
+        nld_bins=config["h2"]["ld_bins"],
+        nmaf_bins=config["h2"]["maf_bins"],
+        maf_bins=[0.0, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5],
+    script:
+        "scripts/partition_ld_scores.py"
+
+
+rule create_grms:
+    """Create a LD + MAF stratified GRM for estimation of effects."""
+    input:
+        pgen="results/pgen_input/{project_name}.pgen",
+        psam="results/pgen_input/{project_name}.psam",
+        pvar="results/pgen_input/{project_name}.pvar",
+        excludes="results/covariates/{project_name}.{sex}.plink2.exclude.txt",
+        ldms_snps="results/h2/h2sq_ldms/ld_score/{project_name}.ld_{p}.maf_{i}.txt",
+    output:
+        grm="results/h2/h2sq_ldms/grms/{project_name}.{sex}.ld_{p}.maf_{i}.grm.bin",
+        grm_n="results/h2/h2sq_ldms/grms/{project_name}.{sex}.ld_{p}.maf_{i}.grm.N.bin",
+        grm_id="results/h2/h2sq_ldms/grms/{project_name}.{sex}.ld_{p}.maf_{i}.grm.id",
+    params:
+        pfile=lambda wildcards: f"results/pgen_input/{wildcards.project_name}",
+        outfix=lambda wildcards: f"results/h2/h2sq_ldms/grms/{wildcards.project_name}.{wildcards.sex}.ld_{wildcards.p}.maf_{wildcards.i}",
+    resources:
+        time="4:00:00",
+        mem_mb="20G",
+    threads: 4
+    shell:
+        """
+        gcta --pfile {params.pfile}\
+        --threads {threads}\
+        --remove {input.excludes}\
+        --extract {input.ldms_snps}\
+        --make-grm\
+        --out {params.outfix}
+        """
+
+
+rule estimate_h2_ldms:
+    """Estimate h2snp stratified by LD + MAF."""
+    input:
+        grms=expand(
+            "results/h2/h2sq_ldms/grms/{{project_name}}.{{sex}}.ld_{p}.maf_{i}.grm.bin",
+            p=range(config["h2"]["ld_bins"]),
+            i=range(config["h2"]["maf_bins"]),
+        ),
+        pheno="results/h2/h2sq_chrom/pheno/{project_name}.{sex}.chr1.{pheno}.txt",
+        covar="results/h2/h2sq_chrom/covars/{project_name}.{sex}.chr1.{pheno}.covars.txt",
+    output:
+        mgrms=temp("results/h2sq_ldms/h2_est/{project_name}.{sex}.{pheno}.mgrms"),
+        hsq="results/h2/h2sq_ldms/h2_est/{project_name}.{sex}.{pheno}.hsq",
+    params:
+        outfix=lambda wildcards: f"results/h2/h2sq_ldms/h2_est/{wildcards.project_name}.{wildcards.sex}.{wildcards.pheno}",
+    resources:
+        time="4:00:00",
+        mem_mb="10G",
+    threads: 8
+    shell:
+        """
+        ls {input.grms} | sed 's/\.grm.*//' > {output.mgrms}
+        gcta --reml --mgrm {output.mgrms} --pheno {input.pheno} --qcovar {input.covar} --reml-no-constrain --out {params.outfix} --threads {threads}
+        """
+
+
+rule collapse_per_chrom_h2_ldms:
+    """Collapse the estimates for h2."""
+    input:
+        hsq="results/h2/h2sq_ldms/h2_est/{project_name}.{sex}.{pheno}.hsq",
+    output:
+        h2sq_tsv="results/h2/h2sq_ldms/h2_est_total/{project_name}.{sex}.{pheno}.hsq",
+    run:
+        df = pd.read_csv(snakemake.input["hsq"], sep="\t", on_bad_lines="skip")
+        df["sex"] = f"{wildcards.sex}"
+        df["pheno"] = f"{wildcards.pheno}"
+        df.to_csv(output.h2sq_tsv, index=None, sep="\t")
+
+
+rule aggregate_h2_ldms:
+    """Final aggregation rule for estimating h2 in GREML-LDMS."""
+    input:
+        hsq_files=expand(
+            "results/h2/h2sq_ldms/h2_est_total/{{project_name}}.{sex}.{pheno}.hsq",
+            sex=["Male", "Female"],
+            pheno=["MeanCO", "CentromereDist", "TelomereDist", "HotspotOccupancy"],
+        ),
+    output:
+        tot_hsq="results/h2/h2sq_ldms/h2_est_total/{project_name}.total.hsq",
+    run:
+        tot_df = pd.concat([pd.read_csv(fp, sep="\t") for fp in input.hsq_files])
+        tot_df.to_csv(output.tot_hsq, sep="\t", index=None)
