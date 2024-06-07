@@ -3,7 +3,7 @@ import polars as pl
 import gzip
 
 
-def obtain_euploid_aneuploid(aneuploidy_fp, ppThresh=0.90):
+def obtain_euploid_aneuploid(aneuploidy_fp, ppThresh=0.90, threads=8):
     karyohmm_dtypes = {
         "sigma_baf": pl.Float32,
         "pi0_baf": pl.Float32,
@@ -19,8 +19,8 @@ def obtain_euploid_aneuploid(aneuploidy_fp, ppThresh=0.90):
     aneuploidy_df = pl.read_csv(
         aneuploidy_fp,
         infer_schema_length=10000,
-        dtypes=karyohmm_dtypes,
-        n_threads=8,
+        schema_overrides=karyohmm_dtypes,
+        n_threads=threads,
         null_values=["NA"],
         separator="\t",
     )
@@ -82,7 +82,7 @@ def obtain_euploid_aneuploid(aneuploidy_fp, ppThresh=0.90):
 if __name__ == "__main__":
     # Keep track at the chromosome -level the number of disomies able to be processed ...
     euploid_uids, aneuploid_uids = obtain_euploid_aneuploid(
-        snakemake.input["aneuploidy_tsv"], ppThresh=snakemake.params["ppThresh"]
+        snakemake.input["aneuploidy_tsv"], ppThresh=snakemake.params["ppThresh"], threads=snakemake.threads
     )
     # Load in the crossover dataframe and isolate the euploid embryos
     co_df = pl.read_csv(snakemake.input["co_filt_tsv"], separator="\t")
@@ -103,7 +103,7 @@ if __name__ == "__main__":
     )
     # Write out the euploid embryo locations ...
     with gzip.open(snakemake.output["co_euploid_filt_tsv"], "wb") as f_eu:
-        co_df.filter(pl.col("aneuploid")).write_csv(f_eu, separator="\t")
+        co_df.filter(pl.col("euploid")).write_csv(f_eu, separator="\t")
     # Write out the aneuploid embryo locations ...
     with gzip.open(snakemake.output["co_aneuploid_filt_tsv"], "wb") as f_aneu:
         co_df.filter(pl.col("aneuploid")).write_csv(f_aneu, separator="\t")

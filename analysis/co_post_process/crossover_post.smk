@@ -22,11 +22,11 @@ rule all:
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
         ),
-        expand(
-            "results/statistical_models/{name}.{recmap}.aneuploidy_effect_per_chrom.mean.tsv",
-            name=config["crossover_data"].keys(),
-            recmap=config["recomb_maps"].keys(),
-        ),
+        # expand(
+        #     "results/statistical_models/{name}.{recmap}.aneuploidy_effect_per_chrom.mean.tsv",
+        #     name=config["crossover_data"].keys(),
+        #     recmap=config["recomb_maps"].keys(),
+        # ),
 
 
 # ---------------- Analysis 1a. Conduct preprocessing analyses. -------- #
@@ -143,8 +143,6 @@ rule merge_euploid_aneuploid:
     run:
         euploid_df = pd.read_csv(input.euploid_tsv, sep="\t")
         aneuploid_df = pd.read_csv(input.aneuploid_tsv, sep="\t")
-        euploid_df["aneuploid"] = False
-        aneuploid_df["aneuploid"] = True
         merged_df = pd.concat([euploid_df, aneuploid_df])
         merged_df.to_csv(output.merged_tsv, sep="\t", index=None)
 
