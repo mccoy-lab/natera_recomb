@@ -20,8 +20,8 @@ def telomere_dist(chrom, pos, telomere_dict):
     return dist
 
 
-def avg_rt_content(rt_df):
-    """Estimate the average replication timing."""
+def rt_dict(rt_df):
+    """Generating chromosome-specific interpolation functions for replication timing."""
     assert "chrom" in rt_df.columns
     assert "midpt" in rt_df.columns
     assert "rt" in rt_df.columns
@@ -113,6 +113,41 @@ def avg_dist_telomere(df, telomere_df, frac_siblings=0.5):
         ["father", "father", "telomere_dist"]
     ]
     father_df.columns = ["FID", "IID", "TelomereDist"]
+    tot_df = pd.concat([mother_df, father_df])
+    return tot_df
+
+
+def avg_replication_timing(df, rt_df):
+    """Compute phenotypes for replication timing."""
+    assert "mother" in df.columns
+    assert "father" in df.columns
+    assert "child" in df.columns
+    assert "crossover_sex" in df.columns
+    assert "chrom" in df.columns
+    assert "avg_pos" in df.columns
+    assert "nsibs" in df.columns
+    assert "nsib_support" in df.columns
+    # 1. Create the replication timing dictionary
+    rt_dict = rt_dict(rt_df)
+    # 2. Iterate through the rows of the dataframe
+    rt_vector = np.zeros(df.shape[0])
+    for i, (chrom, pos) in tqdm(enumerate(zip(df["chrom"].values, df["pos"].values))):
+        rt_vector[i] = rt_dict[chrom](pos)
+    df["ReplicationTiming"] = rt_vector
+    mother_df = (
+        df[df.crossover_sex == "maternal"]
+        .groupby("mother")["ReplicationTiming"]
+        .agg(lambda x: np.nanmean)
+        .reset_index()[["mother", "mother", "ReplicationTiming"]]
+    )
+    mother_df.columns = ["FID", "IID", "ReplicationTiming"]
+    father_df = (
+        df[df.crossover_sex == "paternal"]
+        .groupby("father")["ReplicationTiming"]
+        .agg(lambda x: np.nanmean)
+        .reset_index()[["father", "father", "ReplicationTiming"]]
+    )
+    father_df.columns = ["FID", "IID", "ReplicationTiming"]
     tot_df = pd.concat([mother_df, father_df])
     return tot_df
 
