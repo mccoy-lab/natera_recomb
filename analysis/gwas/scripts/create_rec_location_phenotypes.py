@@ -130,11 +130,13 @@ def avg_replication_timing(df, rt_df):
     assert "nsibs" in df.columns
     assert "nsib_support" in df.columns
     # 1. Create the replication timing dictionary
-    rt_dict = rt_dict(rt_df)
+    rt_agg_dict = rt_dict(rt_df)
     # 2. Iterate through the rows of the dataframe
     rt_vector = np.zeros(df.shape[0])
-    for i, (chrom, pos) in tqdm(enumerate(zip(df["chrom"].values, df["pos"].values))):
-        rt_vector[i] = rt_dict[chrom](pos)
+    for i, (chrom, pos) in tqdm(
+        enumerate(zip(df["chrom"].values, df["avg_pos"].values))
+    ):
+        rt_vector[i] = rt_agg_dict[chrom](pos)
     df["ReplicationTiming"] = rt_vector
     mother_df = (
         df[df.crossover_sex == "maternal"]
@@ -157,11 +159,14 @@ def avg_replication_timing(df, rt_df):
 def avg_gc_content(df, bw_file, window=500):
     """Calculate the average GC content in a window around the average crossover position."""
     assert window > 0
-    assert bw_file.isBigWig()
+    bw = pyBigWig.open(bw_file)
+    assert bw.isBigWig()
     # Create a vector for the GC content ...
     gc_content = np.zeros(df.shape[0])
-    for i, (chrom, pos) in tqdm(enumerate(zip(df["chrom"].values, df["pos"].values))):
-        gc_content[i] = bw_file.stats(
+    for i, (chrom, pos) in tqdm(
+        enumerate(zip(df["chrom"].values, df["avg_pos"].values))
+    ):
+        gc_content[i] = bw.stats(
             chrom, int(pos - window), int(pos + window), type="mean"
         )[0]
     df["GcContent"] = gc_content
@@ -192,6 +197,7 @@ if __name__ == "__main__":
     telomere_df.columns = ["chrom", "start", "end", "feature"]
     rt_df = pd.read_csv(snakemake.input["replication_timing"], header=None, sep="\t")
     rt_df.columns = ["chrom", "start", "end", "rt"]
+    rt_df["midpt"] = (rt_df["start"] + rt_df["end"]) / 2
     centromere_pheno_df = avg_dist_centromere(co_df, centromere_df)
     telomere_pheno_df = avg_dist_telomere(co_df, telomere_df)
     rt_pheno_df = avg_replication_timing(co_df, rt_df)

@@ -241,7 +241,7 @@ rule create_rec_location_phenotypes:
         co_data=config["crossovers"],
         centromeres=config["bed_files"]["centromeres"],
         telomeres=config["bed_files"]["telomeres"],
-        rt=config["bed_files"]["replication_timing"],
+        replication_timing=config["bed_files"]["replication_timing"],
         gc_content=config["bed_files"]["gc_content"],
     output:
         pheno="results/phenotypes/{project_name}.{format}.location.pheno",
