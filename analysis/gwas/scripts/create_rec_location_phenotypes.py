@@ -3,9 +3,11 @@
 import numpy as np
 import pandas as pd
 from scipy import stats
+from scipy.interpolate import interp1d
 from tqdm import tqdm
 
-# NOTE: need to be divided by the total length of the chromosome ...  
+
+# NOTE: need to be divided by the total length of the chromosome ...
 def centromere_dist(chrom, pos, centromere_dict):
     pts = np.array([centromere_dict["start"][chrom], centromere_dict["end"][chrom]])
     dist = np.min(np.abs(pos - pts))
@@ -16,6 +18,21 @@ def telomere_dist(chrom, pos, telomere_dict):
     pts = np.array([telomere_dict["start"][chrom], telomere_dict["end"][chrom]])
     dist = np.min(np.abs(pos - pts))
     return dist
+
+
+def avg_rt_content(rt_df):
+    """Estimate the average replication timing."""
+    assert "chrom" in rt_df.columns
+    assert "midpt" in rt_df.columns
+    assert "rt" in rt_df.columns
+    rt_func_dict = {}
+    for chrom in np.unique(rt_df.chrom.values):
+        rt_func_dict[chrom] = interp1d(
+            rt_df[rt_df.chrom == chrom].midpt.values,
+            rt_df[rt_df.chrom == chrom].rt.values,
+            bounds_error=False,
+        )
+    return rt_func_dict
 
 
 def avg_dist_centromere(df, centromere_df, frac_siblings=0.5):
@@ -98,17 +115,6 @@ def avg_dist_telomere(df, telomere_df, frac_siblings=0.5):
     father_df.columns = ["FID", "IID", "TelomereDist"]
     tot_df = pd.concat([mother_df, father_df])
     return tot_df
-
-
-def avg_gc_content(df, gc_df, window_size=500):
-    """Estimate the average GC content around a crossover."""
-    pass
-
-
-def avg_rt_content(df, rt_df, window_size=500):
-    """Estimate the average replication timing."""
-    pass
-
 
 
 if __name__ == "__main__":
