@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from scipy.interpolate import interp1d
+import pyBigWig
 from tqdm import tqdm
 
 
@@ -148,6 +149,35 @@ def avg_replication_timing(df, rt_df):
         .reset_index()[["father", "father", "ReplicationTiming"]]
     )
     father_df.columns = ["FID", "IID", "ReplicationTiming"]
+    tot_df = pd.concat([mother_df, father_df])
+    return tot_df
+
+
+def avg_gc_content(df, bw_file, window=500):
+    """Calculate the average GC content in a window around the average crossover position."""
+    assert window > 0
+    assert bw_file.isBigWig()
+    # Create a vector for the GC content ...
+    gc_content = np.zeros(df.shape[0])
+    for i, (chrom, pos) in tqdm(enumerate(zip(df["chrom"].values, df["pos"].values))):
+        gc_content[i] = bw_file.stats(
+            chrom, int(pos - window), int(pos + window), type="mean"
+        )[0]
+    df["GcContent"] = gc_content
+    mother_df = (
+        df[df.crossover_sex == "maternal"]
+        .groupby("mother")["GcContent"]
+        .agg(lambda x: np.nanmean)
+        .reset_index()[["mother", "mother", "GcContent"]]
+    )
+    mother_df.columns = ["FID", "IID", "GcContent"]
+    father_df = (
+        df[df.crossover_sex == "paternal"]
+        .groupby("father")["GcContent"]
+        .agg(lambda x: np.nanmean)
+        .reset_index()[["father", "father", "GcContent"]]
+    )
+    father_df.columns = ["FID", "IID", "GcContent"]
     tot_df = pd.concat([mother_df, father_df])
     return tot_df
 
