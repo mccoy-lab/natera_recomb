@@ -5,7 +5,7 @@ import pandas as pd
 from scipy import stats
 from tqdm import tqdm
 
-
+# NOTE: need to be divided by the total length of the chromosome ...  
 def centromere_dist(chrom, pos, centromere_dict):
     pts = np.array([centromere_dict["start"][chrom], centromere_dict["end"][chrom]])
     dist = np.min(np.abs(pos - pts))
@@ -18,7 +18,7 @@ def telomere_dist(chrom, pos, telomere_dict):
     return dist
 
 
-def avg_dist_centromere(df, centromere_df, frac_siblings=0.75):
+def avg_dist_centromere(df, centromere_df, frac_siblings=0.5):
     """Compute the average distance in bp from centromere of the nearest crossover."""
     assert "mother" in df.columns
     assert "father" in df.columns
@@ -60,7 +60,7 @@ def avg_dist_centromere(df, centromere_df, frac_siblings=0.75):
     return tot_df
 
 
-def avg_dist_telomere(df, telomere_df, frac_siblings=0.75):
+def avg_dist_telomere(df, telomere_df, frac_siblings=0.5):
     """Compute the average distance in bp from the telomeres of the nearest crossover."""
     assert "mother" in df.columns
     assert "father" in df.columns
@@ -98,6 +98,17 @@ def avg_dist_telomere(df, telomere_df, frac_siblings=0.75):
     father_df.columns = ["FID", "IID", "TelomereDist"]
     tot_df = pd.concat([mother_df, father_df])
     return tot_df
+
+
+def avg_gc_content(df, gc_df, window_size=500):
+    """Estimate the average GC content around a crossover."""
+    pass
+
+
+def avg_rt_content(df, rt_df, window_size=500):
+    """Estimate the average replication timing."""
+    pass
+
 
 
 if __name__ == "__main__":
