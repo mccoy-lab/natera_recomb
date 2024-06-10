@@ -226,6 +226,8 @@ rule create_rec_location_phenotypes:
         co_data=config["crossovers"],
         centromeres=config["bed_files"]["centromeres"],
         telomeres=config["bed_files"]["telomeres"],
+        rt=config["bed_files"]["replication_timing"],
+        gc_content=config["bed_files"]["gc_content"],
     output:
         pheno="results/phenotypes/{project_name}.{format}.location.pheno",
     resources:
@@ -233,6 +235,7 @@ rule create_rec_location_phenotypes:
         mem_mb="8G",
     params:
         plink_format=lambda wildcards: wildcards.format == "plink2",
+        gc_window=250,
     script:
         "scripts/create_rec_location_phenotypes.py"
 
@@ -490,8 +493,6 @@ rule obtain_allele_frequencies:
 
 
 # ----------- Mapping variants to genes ----------- #
-
-
 rule reformat_gencode_bed:
     input:
         gencode_annotation=config["gencode"],
@@ -564,7 +565,7 @@ rule combine_gwas_effect_size_afreq:
                 "Gencode",
                 "Dist",
             ]
-            df["PHENO"] = f"{pheno}_{sex}"
+        df["PHENO"] = f"{pheno}_{sex}"
         freq_df = pd.read_csv(input.freqs, sep="\t")
         freq_df.rename(columns={"#CHROM": "CHROM"}, inplace=True)
         beta_df = pd.read_csv(input.top_variants, sep="\t")

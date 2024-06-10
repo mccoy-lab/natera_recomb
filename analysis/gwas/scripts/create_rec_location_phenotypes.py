@@ -5,6 +5,7 @@ import pandas as pd
 from scipy import stats
 from scipy.interpolate import interp1d
 import pyBigWig
+from functools import reduce
 from tqdm import tqdm
 
 
@@ -189,9 +190,19 @@ if __name__ == "__main__":
     centromere_df.columns = ["chrom", "start", "end", "feature"]
     telomere_df = pd.read_csv(snakemake.input["telomeres"], header=None, sep="\t")
     telomere_df.columns = ["chrom", "start", "end", "feature"]
+    rt_df = pd.read_csv(snakemake.input["replication_timing"], header=None, sep="\t")
+    rt_df.columns = ["chrom", "start", "end", "rt"]
     centromere_pheno_df = avg_dist_centromere(co_df, centromere_df)
     telomere_pheno_df = avg_dist_telomere(co_df, telomere_df)
-    merged_df = centromere_pheno_df.merge(telomere_pheno_df, on=["FID", "IID"])
+    rt_pheno_df = avg_replication_timing(co_df, rt_df)
+    gc_pheno_df = avg_gc_content(
+        co_df, snakemake.input["gc_content"], window=snakemake.params["gc_window"]
+    )
+    data_frames = [centromere_pheno_df, telomere_pheno_df, rt_pheno_df]
+    merged_df = reduce(
+        lambda left, right: pd.merge(left, right, on=["FID", "IID"], how="outer"),
+        data_frames,
+    )
     if snakemake.params["plink_format"]:
         merged_df.rename(columns={"FID": "#FID"}, inplace=True)
-    merged_df.to_csv(snakemake.output["pheno"], sep="\t", index=None)
+    merged_df.to_csv(snakemake.output["pheno"], sep="\t", na_rep="NA", index=None)
