@@ -23,6 +23,21 @@ for chrom in chroms:
     ] = f"{config['datadir']}spectrum_imputed_{chrom}_rehead_filter_cpra.vcf.gz"
 
 
+# ------- Defining the phenotypes to explore ------ #
+phenotypes = [
+    "RandMeanCO",
+    "MeanCO",
+    "VarCO",
+    "cvCO",
+    "RandPheno",
+    "CentromereDist",
+    "TelomereDist",
+    "HotspotOccupancy",
+    "GcContent",
+    "ReplicationTiming",
+]
+
+
 # ------- Rules Section ------- #
 localrules:
     all,
@@ -35,11 +50,11 @@ rule all:
             format="plink2",
             project_name=config["project_name"],
         ),
-        expand(
-            "results/h2/h2sq_{mode}/h2_est_total/{project_name}.total.hsq",
-            project_name=config["project_name"],
-            mode=["chrom", "ldms"],
-        ),
+#         expand(
+            # "results/h2/h2sq_{mode}/h2_est_total/{project_name}.total.hsq",
+            # project_name=config["project_name"],
+            # mode=["chrom"],
+#         ),
 
 
 # ------- 0. Preprocess Genetic data ------- #
@@ -361,15 +376,7 @@ rule regenie_step2:
     output:
         expand(
             "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}_{pheno}.regenie.gz",
-            pheno=[
-                "MeanCO",
-                "VarCO",
-                "cvCO",
-                "RandPheno",
-                "CentromereDist",
-                "TelomereDist",
-                "HotspotOccupancy",
-            ],
+            pheno=phenotypes,
         ),
     resources:
         time="6:00:00",
@@ -395,16 +402,7 @@ rule plink_regression:
     output:
         expand(
             "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}.{pheno}.glm.linear",
-            pheno=[
-                "RandMeanCO",
-                "MeanCO",
-                "VarCO",
-                "cvCO",
-                "RandPheno",
-                "CentromereDist",
-                "TelomereDist",
-                "HotspotOccupancy",
-            ],
+            pheno=phenotypes,
         ),
     resources:
         time="6:00:00",
@@ -625,16 +623,7 @@ rule combine_gwas_results:
     input:
         sumstats=expand(
             "results/gwas_output/{{format}}/clumped/{{project_name}}_{sex}_{{format}}.{pheno}.sumstats.final.tsv",
-            pheno=[
-                "RandMeanCO",
-                "MeanCO",
-                "VarCO",
-                "cvCO",
-                "RandPheno",
-                "CentromereDist",
-                "TelomereDist",
-                "HotspotOccupancy",
-            ],
+            pheno=phenotypes,
             sex=["Male", "Female"],
         ),
     output:
@@ -764,7 +753,7 @@ rule aggregate_per_chrom_h2_multitrait:
         hsq_files=expand(
             "results/h2/h2sq_chrom/h2_est_total/{{project_name}}.{sex}.{pheno}.hsq",
             sex=["Male", "Female"],
-            pheno=["MeanCO", "CentromereDist", "TelomereDist", "HotspotOccupancy"],
+            pheno=phenotypes,
         ),
     output:
         tot_hsq="results/h2/h2sq_chrom/h2_est_total/{project_name}.total.hsq",
@@ -902,7 +891,7 @@ rule aggregate_h2_ldms:
         hsq_files=expand(
             "results/h2/h2sq_ldms/h2_est_total/{{project_name}}.{sex}.{pheno}.hsq",
             sex=["Male", "Female"],
-            pheno=["MeanCO", "CentromereDist", "TelomereDist", "HotspotOccupancy"],
+            pheno=phenotypes,
         ),
     output:
         tot_hsq="results/h2/h2sq_ldms/h2_est_total/{project_name}.total.hsq",
