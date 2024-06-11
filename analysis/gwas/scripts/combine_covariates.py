@@ -44,7 +44,11 @@ def generate_parent_meta(meta_df):
         (meta_df.family_position == "mother") | (meta_df.family_position == "father")
     ]
     parent_meta_df = (
-        parent_meta_df.groupby(["array", "family_position"]).agg(np.mean).reset_index()
+        parent_meta_df.groupby(["array", "family_position"])[
+            ["patient_age", "partner_age"]
+        ]
+        .agg("mean")
+        .reset_index()
     )
     parent_meta_df = parent_meta_df.assign(
         sex=[0 if x == "mother" else 1 for x in parent_meta_df["family_position"]],

@@ -6,9 +6,9 @@ Based on proposed model from Coop et al 2008.
 
 import numpy as np
 import pandas as pd
+from intervaltree import IntervalTree
 from scipy.stats import norm
 from tqdm import tqdm
-from intervaltree import IntervalTree
 
 
 def create_co_intervals(co_df):

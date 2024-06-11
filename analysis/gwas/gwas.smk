@@ -5,9 +5,7 @@ import pandas as pd
 
 import pickle, gzip
 from tqdm import tqdm
-from pathlib import Path
 from io import StringIO
-import re
 
 
 # ---- Parameters for inference in Natera Data ---- #
@@ -18,9 +16,24 @@ configfile: "config.yaml"
 vcf_dict = {}
 chroms = [f"chr{i}" for i in range(1, 23)]
 for chrom in chroms:
-    vcf_dict[
-        chrom
-    ] = f"{config['datadir']}spectrum_imputed_{chrom}_rehead_filter_cpra.vcf.gz"
+    vcf_dict[chrom] = (
+        f"{config['datadir']}spectrum_imputed_{chrom}_rehead_filter_cpra.vcf.gz"
+    )
+
+
+# ------- Defining the phenotypes to explore ------ #
+phenotypes = [
+    "RandMeanCO",
+    "MeanCO",
+    "VarCO",
+    "cvCO",
+    "RandPheno",
+    "CentromereDist",
+    "TelomereDist",
+    "HotspotOccupancy",
+    "GcContent",
+    "ReplicationTiming",
+]
 
 
 # ------- Rules Section ------- #
@@ -35,11 +48,13 @@ rule all:
             format="plink2",
             project_name=config["project_name"],
         ),
-        expand(
-            "results/h2/h2sq_{mode}/h2_est_total/{project_name}.total.hsq",
-            project_name=config["project_name"],
-            mode=["chrom", "ldms"],
-        ),
+
+
+#         expand(
+# "results/h2/h2sq_{mode}/h2_est_total/{project_name}.total.hsq",
+# project_name=config["project_name"],
+# mode=["chrom"],
+#         ),
 
 
 # ------- 0. Preprocess Genetic data ------- #
@@ -226,6 +241,8 @@ rule create_rec_location_phenotypes:
         co_data=config["crossovers"],
         centromeres=config["bed_files"]["centromeres"],
         telomeres=config["bed_files"]["telomeres"],
+        replication_timing=config["bed_files"]["replication_timing"],
+        gc_content=config["bed_files"]["gc_content"],
     output:
         pheno="results/phenotypes/{project_name}.{format}.location.pheno",
     resources:
@@ -233,6 +250,7 @@ rule create_rec_location_phenotypes:
         mem_mb="8G",
     params:
         plink_format=lambda wildcards: wildcards.format == "plink2",
+        gc_window=250,
     script:
         "scripts/create_rec_location_phenotypes.py"
 
@@ -244,7 +262,7 @@ rule combine_phenotypes:
         location_pheno="results/phenotypes/{project_name}.{format}.location.pheno",
         hotspot_pheno="results/phenotypes/{project_name}.{format}.hotspot.pheno",
     output:
-        pheno="results/phenotypes/{project_name}.{format}.pheno",
+        pheno="results/phenotypes/{project_name}.{format}.raw.pheno",
     resources:
         time="1:00:00",
         mem_mb="8G",
@@ -285,6 +303,19 @@ rule combine_phenotypes:
             pheno_df.to_csv(output.pheno, sep="\t", na_rep="NA", index=None)
 
 
+rule within_sex_rint:
+    """Apply within-sex IRNT transformations for quantitative phenotypes."""
+    input:
+        pheno="results/phenotypes/{project_name}.{format}.raw.pheno",
+        covar="results/covariates/{project_name}.covars.{format}.txt",
+    output:
+        pheno="results/phenotypes/{project_name}.{format}.pheno",
+    wildcard_constraints:
+        format="plink2|regenie",
+    script:
+        "scripts/sex_specific_irnt.py"
+
+
 # ------ 3. Run GWAS using REGENIE across phenotypes ------ #
 rule create_sex_exclude_file:
     input:
@@ -293,7 +324,7 @@ rule create_sex_exclude_file:
     output:
         sex_specific="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
     wildcard_constraints:
-        sex="Male|Female",
+        sex="Male|Female|Joint",
     resources:
         time="1:00:00",
         mem_mb="8G",
@@ -304,8 +335,10 @@ rule create_sex_exclude_file:
         king_df = pd.read_csv(input["king_excludes"], sep="\t")
         if wildcards.sex == "Male":
             exclude_sex_df = cov_df[cov_df.Sex == 0]
-        else:
+        if wildcards.sex == "Female":
             exclude_sex_df = cov_df[cov_df.Sex == 1]
+        if wildcards.sex == "Joint":
+            exclude_sex_df = cov_df[cov_df.Sex == 2]
         if not params["plink_format"]:
             king_df.columns = ["FID", "IID"]
         concat_df = pd.concat([exclude_sex_df, king_df])
@@ -317,8 +350,6 @@ rule create_sex_exclude_file:
 
 
 # -------- GWAS Steps in REGENIE ---------- #
-
-
 rule regenie_step1:
     """Run the first step of REGENIE for polygenic prediction."""
     input:
@@ -358,15 +389,7 @@ rule regenie_step2:
     output:
         expand(
             "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}_{pheno}.regenie.gz",
-            pheno=[
-                "MeanCO",
-                "VarCO",
-                "cvCO",
-                "RandPheno",
-                "CentromereDist",
-                "TelomereDist",
-                "HotspotOccupancy",
-            ],
+            pheno=phenotypes,
         ),
     resources:
         time="6:00:00",
@@ -392,16 +415,7 @@ rule plink_regression:
     output:
         expand(
             "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}.{pheno}.glm.linear",
-            pheno=[
-                "RandMeanCO",
-                "MeanCO",
-                "VarCO",
-                "cvCO",
-                "RandPheno",
-                "CentromereDist",
-                "TelomereDist",
-                "HotspotOccupancy",
-            ],
+            pheno=phenotypes,
         ),
     resources:
         time="6:00:00",
@@ -412,7 +426,7 @@ rule plink_regression:
     params:
         outfix=lambda wildcards: f"results/gwas_output/{wildcards.format}/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}",
     shell:
-        "plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar}  --pheno {input.pheno} --covar {input.covar} --threads {threads} --memory 9000 --quantile-normalize --glm hide-covar --remove {input.sex_exclusion} --out {params.outfix}"
+        "plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar}  --pheno {input.pheno} --covar {input.covar} --threads {threads} --memory 9000 --covar-quantile-normalize --glm hide-covar --remove {input.sex_exclusion} --out {params.outfix}"
 
 
 rule plink_clumping:
@@ -490,8 +504,6 @@ rule obtain_allele_frequencies:
 
 
 # ----------- Mapping variants to genes ----------- #
-
-
 rule reformat_gencode_bed:
     input:
         gencode_annotation=config["gencode"],
@@ -538,85 +550,8 @@ rule combine_gwas_effect_size_afreq:
         mem_mb="8G",
     wildcard_constraints:
         format="plink2",
-    run:
-        x = Path(input.sumstats)
-        spltname = re.split("\_|\.", x.name)
-        sex = spltname[3]
-        pheno = spltname[5]
-        df = pd.read_csv(input.sumstats, header=None, sep="\t")
-        df.columns = [
-            "CHROM",
-                "POS",
-                "ID",
-                "P",
-                "TOTAL",
-                "NONSIG",
-                "S0.05",
-                "S0.01",
-                "S0.001",
-                "S0.0001",
-                "SP2",
-                "POS_A",
-                "POS_B",
-                "CHROM_X",
-                "GeneStart",
-                "GeneEnd",
-                "Gencode",
-                "Dist",
-            ]
-            df["PHENO"] = f"{pheno}_{sex}"
-        freq_df = pd.read_csv(input.freqs, sep="\t")
-        freq_df.rename(columns={"#CHROM": "CHROM"}, inplace=True)
-        beta_df = pd.read_csv(input.top_variants, sep="\t")
-        beta_df = beta_df.merge(
-            freq_df[["ID", "REF", "ALT", "ALT_FREQS"]],
-            on=["ID", "REF", "ALT"],
-            how="left",
-        )
-        df = df.merge(
-            beta_df[
-                [
-                    "ID",
-                    "REF",
-                    "ALT",
-                    "A1",
-                    "BETA",
-                    "SE",
-                    "T_STAT",
-                    "OBS_CT",
-                    "ALT_FREQS",
-                ]
-            ],
-            on=["ID"],
-            how="left",
-        )
-        final_df = df[
-            [
-                "PHENO",
-                "ID",
-                "P",
-                "REF",
-                "ALT",
-                "ALT_FREQS",
-                "OBS_CT",
-                "BETA",
-                "SE",
-                "A1",
-                "T_STAT",
-                "TOTAL",
-                "NONSIG",
-                "S0.05",
-                "S0.01",
-                "S0.001",
-                "S0.0001",
-                "SP2",
-                "GeneStart",
-                "GeneEnd",
-                "Gencode",
-                "Dist",
-            ]
-        ]
-        final_df.to_csv(output.final_sumstats, sep="\t", index=None)
+    script:
+        "scripts/combine_freq_clump_plink.py"
 
 
 rule combine_gwas_results:
@@ -624,17 +559,8 @@ rule combine_gwas_results:
     input:
         sumstats=expand(
             "results/gwas_output/{{format}}/clumped/{{project_name}}_{sex}_{{format}}.{pheno}.sumstats.final.tsv",
-            pheno=[
-                "RandMeanCO",
-                "MeanCO",
-                "VarCO",
-                "cvCO",
-                "RandPheno",
-                "CentromereDist",
-                "TelomereDist",
-                "HotspotOccupancy",
-            ],
-            sex=["Male", "Female"],
+            pheno=phenotypes,
+            sex=["Male", "Female", "Joint"],
         ),
     output:
         sumstats_final="results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv",
@@ -763,7 +689,7 @@ rule aggregate_per_chrom_h2_multitrait:
         hsq_files=expand(
             "results/h2/h2sq_chrom/h2_est_total/{{project_name}}.{sex}.{pheno}.hsq",
             sex=["Male", "Female"],
-            pheno=["MeanCO", "CentromereDist", "TelomereDist", "HotspotOccupancy"],
+            pheno=phenotypes,
         ),
     output:
         tot_hsq="results/h2/h2sq_chrom/h2_est_total/{project_name}.total.hsq",
@@ -901,7 +827,7 @@ rule aggregate_h2_ldms:
         hsq_files=expand(
             "results/h2/h2sq_ldms/h2_est_total/{{project_name}}.{sex}.{pheno}.hsq",
             sex=["Male", "Female"],
-            pheno=["MeanCO", "CentromereDist", "TelomereDist", "HotspotOccupancy"],
+            pheno=phenotypes,
         ),
     output:
         tot_hsq="results/h2/h2sq_ldms/h2_est_total/{project_name}.total.hsq",

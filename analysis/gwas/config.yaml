@@ -9,6 +9,8 @@ bed_files:
     centromeres: "../../data/gaps/centromeres_grch38.bed"
     telomeres: "../../data/gaps/telomeres_grch38.bed"
     pratto2014: "../../data/gaps/pratto2014_dmc1_hotspots.hg38.tsv"
+    gc_content: "/scratch4/rmccoy22/abiddan1/gc_content_hg38/hg38.gc5Base.bw"
+    replication_timing: "/scratch4/rmccoy22/abiddan1/ipsc_replication_timing_data/iPSC_individual_level_data.averaged.hg38.bed"
 gencode: "/data/rmccoy22/resources/GENCODE/v38/gencode.v38.annotation.gtf.gz"
 datadir: "/data/rmccoy22/natera_spectrum/genotypes/imputed_parents_101823_cpra/"
 methods:

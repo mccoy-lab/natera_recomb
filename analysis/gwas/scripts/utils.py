@@ -1,5 +1,6 @@
+import numpy as np
+from scipy.stats import norm, rankdata
 from sklearn.preprocessing import quantile_transform
-from scipy.stats import rankdata, norm
 
 
 def quantile_normalize(x):

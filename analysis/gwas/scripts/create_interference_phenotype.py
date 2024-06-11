@@ -1,20 +1,18 @@
 """MLE estimates of escape proportion and intensity parameters per-sample."""
 
-import numpy as np
-import pandas as pd
-
 # Actually install the R library for estimating crossover interference
 import subprocess
+
+import numpy as np
+import pandas as pd
 
 subprocess.run(
     "Rscript -e 'install.packages('xoi', repos='http://cran.us.r-project.org')'"
 )
-from scipy.optimize import minimize
-
-
 import rpy2
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
+from scipy.optimize import minimize
 from tqdm import tqdm
 
 xoi = importr("xoi")
