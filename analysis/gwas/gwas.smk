@@ -44,7 +44,7 @@ localrules:
 rule all:
     input:
         expand(
-            "results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv",
+            "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.tsv",
             format="plink2",
             project_name=config["project_name"],
         ),
@@ -426,7 +426,7 @@ rule plink_regression:
     params:
         outfix=lambda wildcards: f"results/gwas_output/{wildcards.format}/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}",
     shell:
-        "plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar}  --pheno {input.pheno} --covar {input.covar} --threads {threads} --memory 9000 --covar-quantile-normalize --glm hide-covar --remove {input.sex_exclusion} --out {params.outfix}"
+        "plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar}  --pheno {input.pheno} --covar {input.covar} --threads {threads} --memory 9000 --covar-quantile-normalize --glm hide-covar --adjust gc --remove {input.sex_exclusion} --out {params.outfix}"
 
 
 rule plink_clumping:
@@ -575,6 +575,16 @@ rule combine_gwas_results:
         final_df = pd.concat(tot_dfs)
         final_df.to_csv(output.sumstats_final, sep="\t", index=None)
 
+rule intersect_w_replication_data:
+    """Intersect with replication dataset from Haldorsson 2019."""
+    input:
+        sumstats = "results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv",
+        haldorsson_sumstats = config['gwas_replication']
+    output:
+        sumstats_replication = "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.tsv"
+    script:
+        "scripts/gwas_replication.py"
+        
 
 # -------- 5. Estimating per-chromosome h2 using GREML -------- #
 rule estimate_per_chrom_sex_grm:
