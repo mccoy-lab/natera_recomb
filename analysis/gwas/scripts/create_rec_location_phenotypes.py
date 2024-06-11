@@ -50,7 +50,7 @@ def avg_dist_centromere(df, centromere_df, frac_siblings=0.5):
     assert frac_siblings >= 0.5
     df["frac_siblings"] = df["nsib_support"] / (df["nsibs"] - 1)
     centromere_dict = (
-        centromere_df.groupby("chrom").agg({"start": np.min, "end": np.max}).to_dict()
+        centromere_df.groupby("chrom").agg({"start": "min", "end": "max"}).to_dict()
     )
     centromere_dists = np.zeros(df.shape[0])
     for i, (chrom, pos) in tqdm(enumerate(zip(df.chrom.values, df.avg_pos.values))):
@@ -61,10 +61,10 @@ def avg_dist_centromere(df, centromere_df, frac_siblings=0.5):
     filt_df = (
         df[df["frac_siblings"] > frac_siblings]
         .groupby(["mother", "father", "child", "chrom", "crossover_sex"])
-        .agg({"centromere_dist": np.min})
+        .agg({"centromere_dist": "min"})
         .reset_index()
         .groupby(["mother", "father", "crossover_sex"])
-        .agg({"centromere_dist": np.mean})
+        .agg({"centromere_dist": "mean"})
         .reset_index()
     )
     mother_df = filt_df[filt_df.crossover_sex == "maternal"][
@@ -92,7 +92,7 @@ def avg_dist_telomere(df, telomere_df, frac_siblings=0.5):
     assert frac_siblings >= 0.5
     df["frac_siblings"] = df["nsib_support"] / (df["nsibs"] - 1)
     telomere_dict = (
-        telomere_df.groupby("chrom").agg({"start": np.min, "end": np.max}).to_dict()
+        telomere_df.groupby("chrom").agg({"start": "min", "end": "max"}).to_dict()
     )
     telomere_dists = np.zeros(df.shape[0])
     for i, (chrom, pos) in tqdm(enumerate(zip(df.chrom.values, df.avg_pos.values))):
@@ -101,10 +101,10 @@ def avg_dist_telomere(df, telomere_df, frac_siblings=0.5):
     filt_df = (
         df[df["frac_siblings"] > frac_siblings]
         .groupby(["mother", "father", "child", "chrom", "crossover_sex"])
-        .agg({"telomere_dist": np.min})
+        .agg({"telomere_dist": "min"})
         .reset_index()
         .groupby(["mother", "father", "crossover_sex"])
-        .agg({"telomere_dist": np.mean})
+        .agg({"telomere_dist": "mean"})
         .reset_index()
     )
     mother_df = filt_df[filt_df.crossover_sex == "maternal"][
@@ -141,14 +141,14 @@ def avg_replication_timing(df, rt_df):
     mother_df = (
         df[df.crossover_sex == "maternal"]
         .groupby("mother")["ReplicationTiming"]
-        .agg(lambda x: np.nanmean)
+        .agg("mean")
         .reset_index()[["mother", "mother", "ReplicationTiming"]]
     )
     mother_df.columns = ["FID", "IID", "ReplicationTiming"]
     father_df = (
         df[df.crossover_sex == "paternal"]
         .groupby("father")["ReplicationTiming"]
-        .agg(lambda x: np.nanmean)
+        .agg("mean")
         .reset_index()[["father", "father", "ReplicationTiming"]]
     )
     father_df.columns = ["FID", "IID", "ReplicationTiming"]
@@ -173,14 +173,14 @@ def avg_gc_content(df, bw_file, window=500):
     mother_df = (
         df[df.crossover_sex == "maternal"]
         .groupby("mother")["GcContent"]
-        .agg(lambda x: np.nanmean)
+        .agg("mean")
         .reset_index()[["mother", "mother", "GcContent"]]
     )
     mother_df.columns = ["FID", "IID", "GcContent"]
     father_df = (
         df[df.crossover_sex == "paternal"]
         .groupby("father")["GcContent"]
-        .agg(lambda x: np.nanmean)
+        .agg("mean")
         .reset_index()[["father", "father", "GcContent"]]
     )
     father_df.columns = ["FID", "IID", "GcContent"]
@@ -204,7 +204,7 @@ if __name__ == "__main__":
     gc_pheno_df = avg_gc_content(
         co_df, snakemake.input["gc_content"], window=snakemake.params["gc_window"]
     )
-    data_frames = [centromere_pheno_df, telomere_pheno_df, rt_pheno_df]
+    data_frames = [centromere_pheno_df, telomere_pheno_df, rt_pheno_df, gc_pheno_df]
     merged_df = reduce(
         lambda left, right: pd.merge(left, right, on=["FID", "IID"], how="outer"),
         data_frames,
