@@ -575,16 +575,17 @@ rule combine_gwas_results:
         final_df = pd.concat(tot_dfs)
         final_df.to_csv(output.sumstats_final, sep="\t", index=None)
 
+
 rule intersect_w_replication_data:
     """Intersect with replication dataset from Haldorsson 2019."""
     input:
-        sumstats = "results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv",
-        haldorsson_sumstats = config['gwas_replication']
+        sumstats="results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv",
+        replication=config["gwas_replication"],
     output:
-        sumstats_replication = "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.tsv"
+        sumstats_replication="results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.tsv",
     script:
         "scripts/gwas_replication.py"
-        
+
 
 # -------- 5. Estimating per-chromosome h2 using GREML -------- #
 rule estimate_per_chrom_sex_grm:
