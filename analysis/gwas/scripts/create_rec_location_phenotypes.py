@@ -1,11 +1,12 @@
 #!python3
 
+from functools import reduce
+
 import numpy as np
 import pandas as pd
+import pyBigWig
 from scipy import stats
 from scipy.interpolate import interp1d
-import pyBigWig
-from functools import reduce
 from tqdm import tqdm
 
 
