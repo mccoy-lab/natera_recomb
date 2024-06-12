@@ -413,9 +413,11 @@ rule plink_regression:
         covar="results/covariates/{project_name}.covars.{format}.txt",
         sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
     output:
-        gwas_sumstats=expand(
-            "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}.{pheno}.raw.glm.linear",
-            pheno=phenotypes,
+        gwas_sumstats=temp(
+            expand(
+                "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}.{pheno}.raw.glm.linear",
+                pheno=phenotypes,
+            )
         ),
         gwas_sumstats_adjusted=temp(
             expand(
@@ -447,13 +449,14 @@ rule match_pval_gc:
         gwas_adjusted="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.raw.glm.linear.adjusted",
     output:
         gwas_results="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
+        gwas_raw_results="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.raw.glm.linear.gz",
     wildcard_constraints:
         format="plink2",
     resources:
         time="1:00:00",
         mem_mb="5G",
     shell:
-        "awk 'FNR == NR && NR > 1 {{a[$2]=$5; next}} {{if ($3 in a) {{$15=a[$3]; print $0}} else {{print $0}}}}' {input.gwas_adjusted} {input.gwas_results} | awk 'NR > 1' | column -t > {output.gwas_results}"
+        "awk 'FNR == NR && NR > 1 {{a[$2]=$5; next}} {{if ($3 in a) {{$15=a[$3]; print $0}} else {{print $0}}}}' {input.gwas_adjusted} {input.gwas_results} | awk 'NR > 1' | column -t > {output.gwas_results}; gzip -c {input.gwas_results} > {output.raw_gwas_results}"
 
 
 rule plink_clumping:
