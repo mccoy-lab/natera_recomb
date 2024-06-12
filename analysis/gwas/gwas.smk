@@ -403,7 +403,7 @@ rule regenie_step2:
         """
 
 
-# ------ 4. Run GWAS using Plink2 across phenotypes ------ #
+# ------ 4. Run GWAS using Plink2 across phenotypes w. GC correction. ------ #
 rule plink_regression:
     input:
         pgen="results/pgen_input/{project_name}.pgen",
@@ -413,9 +413,15 @@ rule plink_regression:
         covar="results/covariates/{project_name}.covars.{format}.txt",
         sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
     output:
-        expand(
-            "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}.{pheno}.glm.linear",
+        gwas_sumstats=expand(
+            "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}.{pheno}.raw.glm.linear",
             pheno=phenotypes,
+        ),
+        gwas_sumstats_adjusted=temp(
+            expand(
+                "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}.{pheno}.raw.glm.linear.adjusted",
+                pheno=phenotypes,
+            )
         ),
     resources:
         time="6:00:00",
@@ -424,9 +430,30 @@ rule plink_regression:
     wildcard_constraints:
         format="plink2",
     params:
-        outfix=lambda wildcards: f"results/gwas_output/{wildcards.format}/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}",
+        outfix=lambda wildcards: f"results/gwas_output/{wildcards.format}/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}.raw",
     shell:
-        "plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar}  --pheno {input.pheno} --covar {input.covar} --threads {threads} --memory 9000 --covar-quantile-normalize --glm hide-covar --adjust gc --remove {input.sex_exclusion} --out {params.outfix}"
+        """
+        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar}\
+        --pheno {input.pheno} --covar {input.covar} --threads {threads}\
+        --memory 9000 --covar-quantile-normalize --glm hide-covar\
+        --adjust gc --remove {input.sex_exclusion} --out {params.outfix}
+        """
+
+
+rule match_pval_gc:
+    """Match the p-values from the adjusted setting for GC control."""
+    input:
+        gwas_results="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.raw.glm.linear",
+        gwas_adjusted="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.raw.glm.linear.adjusted",
+    output:
+        gwas_results="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
+    wildcard_constraints:
+        format="plink2",
+    resources:
+        time="1:00:00",
+        mem_mb="5G",
+    shell:
+        "awk 'FNR == NR && NR > 1 {{a[$2]=$5; next}} {{if ($3 in a) {{$15=a[$3]; print $0}} else {{print $0}}}}' {input.gwas_adjusted} {input.gwas_results} | awk 'NR > 1' | column -t > {output.gwas_results}"
 
 
 rule plink_clumping:
