@@ -456,7 +456,7 @@ rule match_pval_gc:
         time="1:00:00",
         mem_mb="5G",
     shell:
-        "awk 'FNR == NR && NR > 1 {{a[$2]=$5; next}} {{if ($3 in a) {{$15=a[$3]; print $0}} else {{print $0}}}}' {input.gwas_adjusted} {input.gwas_results} | awk 'NR > 1' | column -t > {output.gwas_results}; gzip -c {input.gwas_results} > {output.raw_gwas_results}"
+        "awk 'FNR == NR && NR > 1 {{a[$2]=$5; next}} {{if ($3 in a) {{$15=a[$3]; print $0}} else {{print $0}}}}' {input.gwas_adjusted} {input.gwas_results} | awk 'NR > 1' | column -t > {output.gwas_results}; gzip -c {input.gwas_results} > {output.gwas_raw_results}"
 
 
 rule plink_clumping:
