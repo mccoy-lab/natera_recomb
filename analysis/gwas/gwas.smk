@@ -14,7 +14,7 @@ configfile: "config.yaml"
 
 # Create the VCF data dictionary for each chromosome ...
 vcf_dict = {}
-chroms = [f"chr{i}" for i in range(1, 23)]
+chroms = [f"chr{i}" for i in range(1, 24)]
 for chrom in chroms:
     vcf_dict[chrom] = (
         f"{config['datadir']}spectrum_imputed_{chrom}_rehead_filter_cpra.vcf.gz"
