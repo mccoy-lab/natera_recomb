@@ -417,11 +417,10 @@ rule plink_regression:
             "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}.raw.{pheno}.glm.linear",
             pheno=phenotypes,
         ),
-        gwas_sumstats_adjusted=
-            expand(
-                "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}.raw.{pheno}.glm.linear.adjusted",
-                pheno=phenotypes,
-            ),
+        gwas_sumstats_adjusted=expand(
+            "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}.raw.{pheno}.glm.linear.adjusted",
+            pheno=phenotypes,
+        ),
     resources:
         time="6:00:00",
         mem_mb="10G",
@@ -452,7 +451,7 @@ rule match_pval_gc:
         time="1:00:00",
         mem_mb="5G",
     shell:
-        "awk 'FNR == NR && NR > 1 {{a[$2]=$5; next}} {{if ($3 in a) {{$15=a[$3]; print $0}} else {{print $0}}}}' {input.gwas_adjusted} {input.gwas_results} | awk 'NR > 1' | tr [:blank:] \\t  > {output.gwas_results}"
+        "awk 'FNR == NR && NR > 1 {{a[$2]=$5; next}} {{if ($3 in a) {{$15=a[$3]; print $0}} else {{print $0}}}}' {input.gwas_adjusted} {input.gwas_results} | awk 'NR > 1' | tr [:blank:] '\t'  > {output.gwas_results}"
 
 
 rule plink_clumping:

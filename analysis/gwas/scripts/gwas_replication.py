@@ -69,7 +69,9 @@ if __name__ == "__main__":
             variant_clusters[i].split(","), haldorsson_ids_dict
         )
     # 3b. Perform gene-level replication of effects
-    df = haldorsson_df.group_by("gene_Haldorsson19").agg(pl.col("Phenotype_Haldorsson19").unique())
+    df = haldorsson_df.group_by("gene_Haldorsson19").agg(
+        pl.col("Phenotype_Haldorsson19").unique()
+    )
     genes = gwas_results_df["Gene"].to_numpy()
     gene_dict = {x for x in df["gene_Haldorsson19"].unique().to_numpy()}
     gene_phenotype_dict = {
