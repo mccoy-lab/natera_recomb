@@ -76,7 +76,11 @@ rule vcf2pgen:
     params:
         outfix=lambda wildcards: f"results/pgen_input/{wildcards.project_name}.{wildcards.chrom}",
     shell:
-        "plink2 --vcf {input.vcf_file} dosage=DS --double-id --maf 0.005 --memory 9000 --threads {threads} --make-pgen --out {params.outfix} "
+        """
+        plink2 --vcf {input.vcf_file} --double-id \
+        --max-alleles 2 --maf 0.005 --memory 9000\
+        --threads {threads} --make-pgen --lax-chrx-import --out {params.outfix} 
+        """
 
 
 rule merge_full_pgen:
