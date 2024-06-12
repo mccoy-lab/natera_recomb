@@ -131,8 +131,8 @@ rule compute_pcs:
         outfix=lambda wildcards: f"results/covariates/{wildcards['project_name']}",
     shell:
         """
-        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --threads {threads} --maf 0.01 --indep-pairwise 200 25 0.4 --out {params.outfix}
-        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --extract {output.keep_variants} --pca {params.npcs} approx --threads {threads} --out {params.outfix}
+        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --threads {threads} --maf 0.01 --memory 9000 --indep-pairwise 200 25 0.4 --out {params.outfix}
+        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --extract {output.keep_variants} --memory 9000 --pca {params.npcs} approx --threads {threads} --out {params.outfix}
         """
 
 
@@ -155,7 +155,7 @@ rule king_related_individuals:
         king_thresh=0.125,
     shell:
         """
-        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --extract {input.keep_variants} --threads {threads} --maf 0.01 --king-cutoff {params.king_thresh} --out {params.outfix}
+        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --extract {input.keep_variants} --threads {threads} --memory 9000 --maf 0.01 --king-cutoff {params.king_thresh} --out {params.outfix}
         """
 
 
