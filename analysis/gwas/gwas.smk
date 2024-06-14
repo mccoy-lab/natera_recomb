@@ -14,7 +14,7 @@ configfile: "config.yaml"
 
 # Create the VCF data dictionary for each chromosome ...
 vcf_dict = {}
-chroms = [f"chr{i}" for i in range(1, 23)]
+chroms = [f"chr{i}" for i in range(1, 24)]
 for chrom in chroms:
     vcf_dict[chrom] = (
         f"{config['datadir']}spectrum_imputed_{chrom}_rehead_filter_cpra.vcf.gz"
@@ -44,7 +44,7 @@ localrules:
 rule all:
     input:
         expand(
-            "results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv",
+            "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.rsids.tsv",
             format="plink2",
             project_name=config["project_name"],
         ),
@@ -76,7 +76,11 @@ rule vcf2pgen:
     params:
         outfix=lambda wildcards: f"results/pgen_input/{wildcards.project_name}.{wildcards.chrom}",
     shell:
-        "plink2 --vcf {input.vcf_file} dosage=DS --double-id --maf 0.005 --memory 9000 --threads {threads} --make-pgen --out {params.outfix} "
+        """
+        plink2 --vcf {input.vcf_file} --double-id \
+        --max-alleles 2 --maf 0.005 --memory 9000\
+        --threads {threads} --make-pgen --lax-chrx-import --out {params.outfix} 
+        """
 
 
 rule merge_full_pgen:
@@ -127,8 +131,8 @@ rule compute_pcs:
         outfix=lambda wildcards: f"results/covariates/{wildcards['project_name']}",
     shell:
         """
-        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --threads {threads} --maf 0.01 --indep-pairwise 200 25 0.4 --out {params.outfix}
-        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --extract {output.keep_variants} --pca {params.npcs} approx --threads {threads} --out {params.outfix}
+        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --threads {threads} --maf 0.01 --memory 9000 --indep-pairwise 200 25 0.4 --out {params.outfix}
+        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --extract {output.keep_variants} --memory 9000 --pca {params.npcs} approx --threads {threads} --out {params.outfix}
         """
 
 
@@ -151,7 +155,7 @@ rule king_related_individuals:
         king_thresh=0.125,
     shell:
         """
-        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --extract {input.keep_variants} --threads {threads} --maf 0.01 --king-cutoff {params.king_thresh} --out {params.outfix}
+        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar} --extract {input.keep_variants} --threads {threads} --memory 9000 --maf 0.01 --king-cutoff {params.king_thresh} --out {params.outfix}
         """
 
 
@@ -403,7 +407,7 @@ rule regenie_step2:
         """
 
 
-# ------ 4. Run GWAS using Plink2 across phenotypes ------ #
+# ------ 4. Run GWAS using Plink2 across phenotypes w. GC correction. ------ #
 rule plink_regression:
     input:
         pgen="results/pgen_input/{project_name}.pgen",
@@ -413,8 +417,12 @@ rule plink_regression:
         covar="results/covariates/{project_name}.covars.{format}.txt",
         sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
     output:
-        expand(
-            "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}.{pheno}.glm.linear",
+        gwas_sumstats=expand(
+            "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}.raw.{pheno}.glm.linear",
+            pheno=phenotypes,
+        ),
+        gwas_sumstats_adjusted=expand(
+            "results/gwas_output/{{format}}/{{project_name}}_{{sex}}_{{format}}.raw.{pheno}.glm.linear.adjusted",
             pheno=phenotypes,
         ),
     resources:
@@ -424,9 +432,30 @@ rule plink_regression:
     wildcard_constraints:
         format="plink2",
     params:
-        outfix=lambda wildcards: f"results/gwas_output/{wildcards.format}/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}",
+        outfix=lambda wildcards: f"results/gwas_output/{wildcards.format}/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}.raw",
     shell:
-        "plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar}  --pheno {input.pheno} --covar {input.covar} --threads {threads} --memory 9000 --covar-quantile-normalize --glm hide-covar --remove {input.sex_exclusion} --out {params.outfix}"
+        """
+        plink2 --pgen {input.pgen} --psam {input.psam} --pvar {input.pvar}\
+        --pheno {input.pheno} --covar {input.covar} --threads {threads}\
+        --memory 9000 --covar-quantile-normalize --glm hide-covar\
+        --adjust gc --remove {input.sex_exclusion} --out {params.outfix}
+        """
+
+
+rule match_pval_gc:
+    """Match the p-values from the adjusted setting for GC control."""
+    input:
+        gwas_results="results/gwas_output/{format}/{project_name}_{sex}_{format}.raw.{pheno}.glm.linear",
+        gwas_adjusted="results/gwas_output/{format}/{project_name}_{sex}_{format}.raw.{pheno}.glm.linear.adjusted",
+    output:
+        gwas_results="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
+    wildcard_constraints:
+        format="plink2",
+    resources:
+        time="1:00:00",
+        mem_mb="5G",
+    shell:
+        "awk 'FNR == NR && NR > 1 {{a[$2]=$5; next}} {{if ($3 in a) {{$15=a[$3]; print $0}} else {{print $0}}}}' {input.gwas_adjusted} {input.gwas_results} | awk 'NR > 1' | tr [:blank:] '\t'  > {output.gwas_results}"
 
 
 rule plink_clumping:
@@ -563,7 +592,9 @@ rule combine_gwas_results:
             sex=["Male", "Female", "Joint"],
         ),
     output:
-        sumstats_final="results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv",
+        sumstats_final=temp(
+            "results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv"
+        ),
     resources:
         time="1:00:00",
         mem_mb="8G",
@@ -574,6 +605,40 @@ rule combine_gwas_results:
             tot_dfs.append(df)
         final_df = pd.concat(tot_dfs)
         final_df.to_csv(output.sumstats_final, sep="\t", index=None)
+
+
+rule intersect_w_replication_data:
+    """Intersect with replication dataset from Haldorsson 2019."""
+    input:
+        sumstats="results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv",
+        replication=config["gwas_replication"],
+    output:
+        sumstats_replication=temp(
+            "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.tsv"
+        ),
+    script:
+        "scripts/gwas_replication.py"
+
+
+rule add_rsids:
+    """Add rsids for lead variants."""
+    input:
+        sumstats_replication="results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.tsv",
+        dbsnp=config["dbsnp"],
+    output:
+        temp_regions=temp(
+            "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.rsids.tmp_regions.txt"
+        ),
+        temp_rsids=temp(
+            "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.rsids.tmp_rsids.txt"
+        ),
+        sumstats_rsids="results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.rsids.tsv",
+    shell:
+        """
+        awk \'NR > 1 {{print $2}}\' {input.sumstats_replication} | awk  -F \":\" \'{{print $1\"\t\"$2}}\' | sed \'s/^chr//g\' > {output.temp_regions}
+        tabix -R {output.temp_regions} {input.dbsnp} | awk \'NR == 1 {{print \"ID\tRSID\"}} {{split($5, a, \",\"); for (x in a) {{print \"chr\"$1\":\"$2\":\"$4\":\"a[x]\"\t\"$3}}}}\' > {output.temp_rsids}
+        awk \'FNR == NR {{a[$1] = $2; next}} {{print $0\"\t\"a[$2]}}\' {output.temp_rsids} {input.sumstats_replication} > {output.sumstats_rsids}
+        """
 
 
 # -------- 5. Estimating per-chromosome h2 using GREML -------- #
