@@ -44,7 +44,7 @@ localrules:
 rule all:
     input:
         expand(
-            "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.tsv",
+            "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.rsids.tsv",
             format="plink2",
             project_name=config["project_name"],
         ),
@@ -592,7 +592,9 @@ rule combine_gwas_results:
             sex=["Male", "Female", "Joint"],
         ),
     output:
-        sumstats_final="results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv",
+        sumstats_final=temp(
+            "results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv"
+        ),
     resources:
         time="1:00:00",
         mem_mb="8G",
@@ -611,9 +613,32 @@ rule intersect_w_replication_data:
         sumstats="results/gwas_output/{format}/finalized/{project_name}.sumstats.tsv",
         replication=config["gwas_replication"],
     output:
-        sumstats_replication="results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.tsv",
+        sumstats_replication=temp(
+            "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.tsv"
+        ),
     script:
         "scripts/gwas_replication.py"
+
+
+rule add_rsids:
+    """Add rsids for lead variants."""
+    input:
+        sumstats_replication="results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.tsv",
+        dbsnp=config["dbsnp"],
+    output:
+        temp_regions=temp(
+            "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.rsids.tmp_regions.txt"
+        ),
+        temp_rsids=temp(
+            "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.rsids.tmp_rsids.txt"
+        ),
+        sumstats_rsids="results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.rsids.tsv",
+    shell:
+        """
+        awk \'NR > 1 {{print $2}}\' {input.sumstats_replication} | awk  -F \":\" \'{{print $1\"\t\"$2}}\' | sed \'s/^chr//g\' > {output.temp_regions}
+        tabix -R {output.temp_regions} {input.dbsnp} | awk \'{{split($5, a, \",\"); for (x in a) {{print \"chr\"$1\":\"$2\":\"$4\":\"a[x]\"\t\"$3}}}}\' > {output.temp_rsids}
+        awk \'FNR == NR {{a[$1] = $2; next}} {{print $0\"\t\"a[$2]}}\' {output.temp_rsids} {input.sumstats_replication} > {output.sumstats_rsids}
+        """
 
 
 # -------- 5. Estimating per-chromosome h2 using GREML -------- #

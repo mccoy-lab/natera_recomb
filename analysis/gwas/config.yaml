@@ -2,6 +2,7 @@ project_name: "natera_recombination_gwas"
 metadata: "../../data/spectrum_metadata_merged.csv"
 crossovers: "../co_post_process/results/v30b_heuristic_90_nsib_qual.crossover_filt.deCode_haldorsson19.euploid_only.meta.tsv.gz"
 recomb_map: "../../data/genmaps/halldorsson19/aau1043_datas3.gz"
+dbsnp: "/scratch4/rmccoy22/abiddan1/dbsnp/00-All.vcf.gz"
 hotspots:
     Male: "../../data/genmaps/halldorsson19/aau1043_datas1.gz"
     Female: "../../data/genmaps/halldorsson19/aau1043_datas2.gz"
