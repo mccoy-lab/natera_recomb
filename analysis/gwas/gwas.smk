@@ -636,7 +636,7 @@ rule add_rsids:
     shell:
         """
         awk \'NR > 1 {{print $2}}\' {input.sumstats_replication} | awk  -F \":\" \'{{print $1\"\t\"$2}}\' | sed \'s/^chr//g\' > {output.temp_regions}
-        tabix -R {output.temp_regions} {input.dbsnp} | awk \'{{split($5, a, \",\"); for (x in a) {{print \"chr\"$1\":\"$2\":\"$4\":\"a[x]\"\t\"$3}}}}\' > {output.temp_rsids}
+        tabix -R {output.temp_regions} {input.dbsnp} | awk \'NR == 1 {{print \"ID\tRSID\"}} {{split($5, a, \",\"); for (x in a) {{print \"chr\"$1\":\"$2\":\"$4\":\"a[x]\"\t\"$3}}}}\' > {output.temp_rsids}
         awk \'FNR == NR {{a[$1] = $2; next}} {{print $0\"\t\"a[$2]}}\' {output.temp_rsids} {input.sumstats_replication} > {output.sumstats_rsids}
         """
 
