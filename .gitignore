@@ -1,4 +1,4 @@
-analysis/*/results/
+analysis/*/results*/
 analysis/*/logs/
 analysis/*/log/
 *.pdf
@@ -8,3 +8,4 @@ analysis/*/log/
 *nohup.*
 */sandbox/*
 sandbox*
+lib/

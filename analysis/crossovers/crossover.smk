@@ -10,7 +10,7 @@ from io import StringIO
 
 # ---- Parameters for inference in Natera Data ---- #
 metadata_file = "../../data/spectrum_metadata_merged.csv"
-aneuploidy_calls = "/data/rmccoy22/natera_spectrum/karyohmm_outputs/compiled_output/natera_embryos_v2.karyohmm_v14.bph_sph_trisomy.071023.tsv.gz"
+aneuploidy_calls = "/data/rmccoy22/natera_spectrum/karyohmm_outputs/compiled_output/natera_embryos.karyohmm_v30a.031624.tsv.gz"
 
 # Create the VCF data dictionary for each chromosome ...
 vcf_dict = {}
@@ -18,7 +18,7 @@ chroms = [f"chr{i}" for i in range(1, 23)]
 for i, c in enumerate(range(1, 23)):
     vcf_dict[
         chroms[i]
-    ] = f"/data/rmccoy22/natera_spectrum/genotypes/opticall_parents_031423/genotypes/eagle_phased_hg38/natera_parents.b38.chr{c}.vcf.gz"
+    ] = f"/data/rmccoy22/natera_spectrum/genotypes/opticall_parents_100423/genotypes/eagle_phased_hg38/natera_parents.b38.chr{c}.vcf.gz"
 
 # Read in the aggregate metadata file
 meta_df = pd.read_csv(metadata_file)
@@ -42,56 +42,84 @@ def create_trios(
     meta_df, sample_file, raw_data_path="/data/rmccoy22/natera_spectrum/data/"
 ):
     """Create a list of valid trio datasets."""
-    valid_trios = []
-    unique_mothers = np.unique(
-        meta_df[meta_df.family_position == "mother"].array.values
+    assert "family_position" in meta_df.columns
+    assert "casefile_id" in meta_df.columns
+    assert "array" in meta_df.columns
+    grouped_df = (
+        meta_df.groupby(["casefile_id", "family_position"])["array"]
+        .agg(lambda x: list(x))
+        .reset_index()
     )
-    for m in tqdm(unique_mothers):
-        cases = np.unique(meta_df[meta_df.array == m].casefile_id.values)
-        cur_df = meta_df[np.isin(meta_df.casefile_id, cases)]
-        fathers = np.unique(cur_df[cur_df.family_position == "father"].array.values)
-        if fathers.size > 1:
-            print(f"More than one partner for {m}")
-            for fat in fathers:
-                cur_cases = np.unique(meta_df[meta_df.array == fat].casefile_id.values)
-                cur_df = meta_df[np.isin(meta_df.casefile_id, cur_cases)]
-                for c in cur_df[cur_df.family_position == "child"].array.values:
-                    valid_trios.append((m, fat, c))
-        elif fathers.size == 1:
-            for c in cur_df[cur_df.family_position == "child"].array.values:
-                valid_trios.append((m, fathers[0], c))
-    parents = [line.rstrip() for line in open(sample_file, "r")]
-    # Applies a set of filters here
-    valid_filt_trios = []
-    for m, f, c in tqdm(valid_trios):
-        if (
-            (m in parents)
-            and (f in parents)
-            and find_child_data(c, meta_df, raw_data_path)[1]
-        ):
-            valid_filt_trios.append((m, f, c))
+    valid_trios = []
+    for case in tqdm(np.unique(grouped_df.casefile_id)):
+        cur_df = grouped_df[grouped_df.casefile_id == case]
+        for m in cur_df[cur_df.family_position == "mother"].array.values[0]:
+            for f in cur_df[cur_df.family_position == "father"].array.values[0]:
+                for c in cur_df[cur_df.family_position == "child"].array.values[0]:
+                    valid_trios.append((case, m, f, c))
 
+    valid_df = pd.DataFrame(
+        valid_trios, columns=["casefile_id", "mother", "father", "child"]
+    )
+    parents = [line.rstrip() for line in open(sample_file, "r")]
+    valid_df["parents_in"] = valid_df.mother.isin(parents) & valid_df.father.isin(
+        parents
+    )
+    valid_df["child_found"] = [
+        find_child_data(c)[1] for c in tqdm(valid_df.child.values)
+    ]
+    valid_filt_df = valid_df[
+        valid_df.parents_in & valid_df.child_found
+    ].drop_duplicates()[["mother", "father", "child"]]
+    valid_filt_trios = [
+        (m, f, c)
+        for (m, f, c) in zip(
+            valid_filt_df.mother.values,
+            valid_filt_df.father.values,
+            valid_filt_df.child.values,
+        )
+    ]
     return valid_filt_trios
 
 
-# Determine if we
+# Run inference for all valid triplets (restricting to euploid chromosomes)
 est_params = False
 total_params = []
 total_data = []
-if Path("results/natera_inference/valid_trios.triplets.euploid.txt").is_file():
-    with open("results/natera_inference/valid_trios.triplets.euploid.txt", "r") as fp:
+total_trisomy_data = []
+if Path("results/natera_inference/valid_trios.triplets.txt").is_file():
+    with open("results/natera_inference/valid_trios.triplets.txt", "r") as fp:
         for i, line in enumerate(fp):
-            [m, f, _] = line.rstrip().split()
-            total_data.append(f"results/natera_inference/{m}+{f}.est_recomb.tsv")
-            if est_params:
-                total_params.append(f"results/natera_inference/{m}+{f}.est_params.tsv")
+            if i > 0:
+                [m, f, _] = line.rstrip().split()
+                total_data.append(
+                    f"results/natera_inference_heuristic/{m}+{f}.est_recomb.tsv"
+                )
+                if est_params:
+                    total_params.append(
+                        f"results/natera_inference/{m}+{f}.est_params.tsv"
+                    )
         total_params = np.unique(total_params).tolist()
         total_data = np.unique(total_data).tolist()
+
+if Path("results/natera_inference_trisomy/valid_trisomies.tsv").is_file():
+    with open("results/natera_inference_trisomy/valid_trisomies.tsv", "r") as fp:
+        for i, line in enumerate(fp):
+            if i > 0:
+                [m, f, c, chrom] = line.rstrip().split()
+                total_trisomy_data.append(
+                    f"results/natera_inference_trisomy/{m}+{f}+{c}.{chrom}.est_recomb_trisomy.tsv"
+                )
+
 
 
 # ------- Rules Section ------- #
 localrules:
     all,
+    generate_parent_sample_list,
+    obtain_valid_trios,
+    filter_triplet_pairs,
+    filter_putative_euploid_triplets,
 
 
 rule all:
@@ -99,7 +127,21 @@ rule all:
         "results/natera_inference/valid_trios.triplets.txt",
         "results/natera_inference/valid_trios.triplets.euploid.txt",
         total_data,
-        total_params,
+        total_trisomy_data,
+
+
+rule euploid_chrom_co:
+    """Run the crossover calling on the euploid chromosomes."""
+    input:
+        "results/natera_inference/valid_trios.triplets.txt",
+        total_data,
+
+
+rule trisomic_chrom_co:
+    """Run the crossover calling on trisomic chromosomes."""
+    input:
+        "results/natera_inference_trisomy/valid_trisomies.txt",
+        total_trisomy_data,
 
 
 rule generate_parent_sample_list:
@@ -153,11 +195,13 @@ rule filter_putative_euploid_triplets:
         aneuploidy_calls=aneuploidy_calls,
     output:
         euploid_triplets="results/natera_inference/valid_trios.triplets.euploid.txt",
+    params:
+        ppThresh=0.90,
     script:
         "scripts/filter_euploid.py"
 
 
-def define_triplets(
+def define_triplets_baf(
     mother_id,
     father_id,
     trio_file="results/natera_inference/valid_trios.triplets.txt",
@@ -168,6 +212,34 @@ def define_triplets(
     res = []
     for c in filt_df.child.values:
         res.append(f"{base_path}/{mother_id}+{father_id}/{c}.bafs.pkl.gz")
+    return res
+
+
+def define_triplets_hmm(
+    mother_id,
+    father_id,
+    trio_file="results/natera_inference/valid_trios.triplets.txt",
+    base_path="/home/abiddan1/scratch16/natera_aneuploidy/analysis/aneuploidy/results/natera_inference",
+):
+    trio_df = pd.read_csv(trio_file, sep="\t")
+    filt_df = trio_df[(trio_df.mother == mother_id) & (trio_df.father == father_id)]
+    res = []
+    for c in filt_df.child.values:
+        res.append(f"{base_path}/{mother_id}+{father_id}/{c}.hmm_model.pkl.gz")
+    return res
+
+
+def define_triplets_hmm(
+    mother_id,
+    father_id,
+    trio_file="results/natera_inference/valid_trios.triplets.txt",
+    base_path="/home/abiddan1/scratch16/natera_aneuploidy/analysis/aneuploidy/results/natera_inference",
+):
+    trio_df = pd.read_csv(trio_file, sep="\t")
+    filt_df = trio_df[(trio_df.mother == mother_id) & (trio_df.father == father_id)]
+    res = []
+    for c in filt_df.child.values:
+        res.append(f"{base_path}/{mother_id}+{father_id}/{c}.hmm_model.pkl.gz")
     return res
 
 
@@ -183,6 +255,7 @@ rule est_params_euploid_chrom_trio:
         est_params="results/natera_inference/{mother}+{father}.est_params.tsv",
     params:
         chroms=chroms,
+        ppThresh=0.90,
     resources:
         time="3:00:00",
         mem_mb="5G",
@@ -190,21 +263,57 @@ rule est_params_euploid_chrom_trio:
         "scripts/est_params_sibling_euploid.py"
 
 
-rule est_crossover_euploid_chrom_trio:
-    """Estimate crossover events for euploid chromosomes in trio datasets."""
+rule est_crossover_euploid_chrom_trio_heuristic:
+    """Estimate crossover events for euploid chromosomes in trio datasets using the heuristic approach of Coop et al 2007."""
     input:
         triplets="results/natera_inference/valid_trios.triplets.txt",
-        baf_pkl=lambda wildcards: define_triplets(
+        baf_pkl=lambda wildcards: define_triplets_baf(
+            mother_id=wildcards.mother, father_id=wildcards.father
+        ),
+        hmm_pkl=lambda wildcards: define_triplets_hmm(
             mother_id=wildcards.mother, father_id=wildcards.father
         ),
         aneuploidy_calls=aneuploidy_calls,
     output:
-        est_recomb="results/natera_inference/{mother}+{father}.est_recomb.tsv",
-        recomb_paths="results/natera_inference/{mother}+{father}.recomb_paths.pkl.gz",
+        est_recomb="results/natera_inference_heuristic/{mother}+{father}.est_recomb.tsv",
     params:
         chroms=chroms,
+        use_prev_params=True,
+        ppThresh=0.90,
+        phaseCorrect=True,
     resources:
-        time="3:00:00",
-        mem_mb="5G",
+        time="1:00:00",
+        mem_mb="10G",
     script:
-        "scripts/sibling_hmm.py"
+        "scripts/sibling_rec_est.py"
+
+
+# --------- Identifying crossovers in trisomies via BPH vs SPH transitions -------- #
+rule isolate_trisomies:
+    """Isolate potential trisomies that we should test using BPH vs. SPH transitions."""
+    input:
+        aneuploidy_calls=aneuploidy_calls,
+    output:
+        trisomy_calls="results/natera_inference_trisomy/valid_trisomies.tsv",
+    params:
+        ppThresh=0.90,
+    run:
+        aneu_df = pd.read_csv(input.aneuploidy_calls, sep="\t")
+        trisomy_df = aneu_df[
+            (aneu_df["post_max"] > params["ppThresh"])
+            & (aneu_df["bf_max_cat"].isin(["3m", "3p"]))
+        ]
+        trisomy_df[["mother", "father", "child", "chrom", "bf_max_cat"]].to_csv(
+            snakemake.output["trisomy_calls"], index=None, sep="\t"
+        )
+
+
+rule est_crossover_trisomic_chrom_trio:
+    """Estimate crossovers using trisomy-specific path tracing."""
+    input:
+        trisomy_calls="results/natera_inference_trisomy/valid_trisomies.tsv",
+        baf_pkl=lambda wildcards: f"{base_path}/{wildcards.mother}+{wildcards.father}/{wildcards.child}.bafs.pkl.gz",
+    output:
+        "results/natera_inference_trisomy/{mother}+{father}+{child}.{chrom}.est_recomb_trisomy.tsv",
+    script:
+        "scripts/sibling_co_trisomy.py"

@@ -1,12 +1,23 @@
 project_name: "natera_recombination_gwas"
 metadata: "../../data/spectrum_metadata_merged.csv"
-crossovers: "../../sandbox/crossovers.euploid_only.061123.v5.tsv.gz"
+crossovers: "../co_post_process/results/v30b_heuristic_90_nsib_qual.crossover_filt.deCode_haldorsson19.euploid_only.meta.tsv.gz"
 recomb_map: "../../data/genmaps/halldorsson19/aau1043_datas3.gz"
+dbsnp: "/scratch4/rmccoy22/abiddan1/dbsnp/00-All.vcf.gz"
+hotspots:
+    Male: "../../data/genmaps/halldorsson19/aau1043_datas1.gz"
+    Female: "../../data/genmaps/halldorsson19/aau1043_datas2.gz"
 bed_files:
     centromeres: "../../data/gaps/centromeres_grch38.bed"
     telomeres: "../../data/gaps/telomeres_grch38.bed"
-    hotspots: "../../data/gaps/pratto2014_dmc1_hotspots.hg38.tsv"
-datadir: "/data/rmccoy22/natera_spectrum/genotypes/imputed_parents_031423/"
+    pratto2014: "../../data/gaps/pratto2014_dmc1_hotspots.hg38.tsv"
+    gc_content: "/scratch4/rmccoy22/abiddan1/gc_content_hg38/hg38.gc5Base.bw"
+    replication_timing: "/scratch4/rmccoy22/abiddan1/ipsc_replication_timing_data/iPSC_individual_level_data.averaged.hg38.bed"
+gwas_replication: "../../data/gwas/aau1043_datas6.total.csv"
+gencode: "/data/rmccoy22/resources/GENCODE/v38/gencode.v38.annotation.gtf.gz"
+datadir: "/data/rmccoy22/natera_spectrum/genotypes/imputed_parents_101823_cpra/"
 methods:
   - "plink2"
   - "regenie"
+h2:
+  maf_bins: 6
+  ld_bins: 4

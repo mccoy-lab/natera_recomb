@@ -9,6 +9,7 @@ configfile: "config.yaml"
 rule all:
     input:
         "results/sims/total_co_sims.tsv.gz",
+        "results/phase_correct/total_phase_err.tsv.gz",
 
 
 rule sim_siblings:
@@ -38,10 +39,7 @@ rule sim_siblings:
 
 
 rule correct_parental_phase:
-    """Apply phase correction for parental genotypes.
-
-    NOTE: We tune this to minimize false-positive switches specifically ...
-    """
+    """Apply phase correction for parental genotypes."""
     input:
         sim="results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
     output:
@@ -54,7 +52,6 @@ rule correct_parental_phase:
         nsibs="\d+",
     params:
         r=-4,
-        log_prob=np.log(0.01),
     script:
         "scripts/phase_correct.py"
 
@@ -80,19 +77,19 @@ rule isolate_true_crossover:
         np.savez_compressed(output.true_co, **data_dict)
 
 
-rule estimate_co_hmm:
-    """Estimate crossover and their locations using the viterbi algorithm."""
+rule estimate_co:
+    """Estimate crossovers using a heuristic approach."""
     input:
         baf="results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.phase_correct.npz",
     output:
-        hmm_out="results/sims/inferhmm_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.corr{corr}.npz",
+        infer_co="results/sims/inferhmm_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.corr{corr}.npz",
     wildcard_constraints:
         corr="0|1",
     params:
         r=-8,
         corrected=lambda wildcards: wildcards.corr == 1,
     script:
-        "scripts/sibhmm_inference.py"
+        "scripts/sib_recest.py"
 
 
 rule concat_true_inferred:
@@ -129,15 +126,23 @@ rule concat_true_inferred:
                 "rep\tpi0\tsigma\tm\tphase_err\tcorrected\tnsibs\tsib_index\tr_hat\tpi0_sib\tsigma_sib\ttrue_co_mat\tinf_co_mat\tinf_co_mat_truehap\ttrue_co_pat\tinf_co_pat\tinf_co_pat_truehap\n"
             )
             i = 0
-            cos_pos_mat = ",".join([str(x) for x in true_data[f"cos_pos_mat_{i}"]])
-            cos_pos_pat = ",".join([str(x) for x in true_data[f"cos_pos_pat_{i}"]])
-            mat_rec_filt = ",".join([str(x) for x in filt_infer_data[f"mat_rec{i}"]])
-            pat_rec_filt = ",".join([str(x) for x in filt_infer_data[f"pat_rec{i}"]])
+            cos_pos_mat = ",".join(
+                [str(filt_infer_data["pos"][x]) for x in true_data[f"cos_pos_mat_{i}"]]
+            )
+            cos_pos_pat = ",".join(
+                [str(filt_infer_data["pos"][x]) for x in true_data[f"cos_pos_pat_{i}"]]
+            )
+            mat_rec_filt = ",".join(
+                [f"({x},{y})" for (x, y) in filt_infer_data[f"mat_rec{i}"]]
+            )
+            pat_rec_filt = ",".join(
+                [f"({x},{y})" for (x, y) in filt_infer_data[f"pat_rec{i}"]]
+            )
             mat_rec_truehap = ",".join(
-                [str(x) for x in filt_infer_data[f"mat_rec_truehap{i}"]]
+                [f"({x},{y})" for (x, y) in filt_infer_data[f"mat_rec_truehap{i}"]]
             )
             pat_rec_truehap = ",".join(
-                [str(x) for x in filt_infer_data[f"pat_rec_truehap{i}"]]
+                [f"({x},{y})" for (x, y) in filt_infer_data[f"pat_rec_truehap{i}"]]
             )
             pi0_sib = np.mean(filt_infer_data[f"pi0_{i}"])
             sigma_sib = np.mean(filt_infer_data[f"sigma_{i}"])
@@ -164,6 +169,46 @@ rule collect_crossover_results:
     run:
         dfs = []
         for fp in input.co_res:
+            dfs.append(pd.read_csv(fp, sep="\t"))
+        tot_df = pd.concat(dfs)
+        tot_df.to_csv(output.tsv, sep="\t", index=None)
+
+# ------ Experiment: Phase Correction -------- #
+rule evaluate_phase_correction:
+    input:
+        sim="results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
+    output:
+        tsv="results/phase_correct/tsvs/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.tsv",
+    params:
+        m=lambda wildcards: int(wildcards.m),
+        phase_err=lambda wildcards: int(wildcards.p) / 1000,
+        nsib=lambda wildcards: int(wildcards.nsibs),
+        pi0=lambda wildcards: int(wildcards.pi0) / 100,
+        sigma=lambda wildcards: int(wildcards.std) / 100,
+        sfs=config["afs"],
+        seed=lambda wildcards: int(wildcards.rep)
+        + int(wildcards.pi0) * 3
+        + int(wildcards.std) * 5,
+    script:
+        "scripts/switch_error.py"
+
+
+rule concat_switch_error:
+    input:
+        phase_err=expand(
+            "results/phase_correct/tsvs/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.tsv",
+            rep=range(config["co_sims"]["reps"]),
+            pi0=config["phase_err"]["pi0"],
+            std=config["phase_err"]["std_dev"],
+            m=config["phase_err"]["m"],
+            p=config["phase_err"]["phase_err"],
+            nsibs=config["phase_err"]["nsibs"],
+        ),
+    output:
+        tsv="results/phase_correct/total_phase_err.tsv.gz",
+    run:
+        dfs = []
+        for fp in input.phase_err:
             dfs.append(pd.read_csv(fp, sep="\t"))
         tot_df = pd.concat(dfs)
         tot_df.to_csv(output.tsv, sep="\t", index=None)

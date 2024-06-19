@@ -1,0 +1,15 @@
+name: co_inf_est 
+channels:
+  - defaults
+  - conda-forge
+  - bioconda
+dependencies:
+  - numpy 
+  - pandas
+  - scipy
+  - rpy2
+  - r-data.table
+  - pip
+  - pip:
+    - tqdm
+    - intervaltree

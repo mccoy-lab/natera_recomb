@@ -8,34 +8,48 @@ from tqdm import tqdm
 cv = lambda x: np.nanstd(x) / np.nanmean(x)
 
 
-def mean_var_co_per_genome(df):
+def mean_var_co_per_genome(df, randomize=True, frac_siblings=0.75, seed=42):
     """Compute the average number of crossovers per-chromosome for an individual."""
     assert "mother" in df.columns
     assert "father" in df.columns
     assert "child" in df.columns
     assert "crossover_sex" in df.columns
     assert "chrom" in df.columns
+    assert "nsibs" in df.columns
+    assert "nsib_support" in df.columns
+    assert frac_siblings >= 0.5
+    assert seed > 0
+    df["frac_siblings"] = df["nsib_support"] / (df["nsibs"] - 1)
     co_df = (
-        df.groupby(["mother", "father", "child", "crossover_sex"])
+        df[df["frac_siblings"] > frac_siblings]
+        .groupby(["mother", "father", "child", "crossover_sex"])
         .count()
         .reset_index()
         .rename(columns={"chrom": "n_crossover"})[
             ["mother", "father", "child", "crossover_sex", "n_crossover"]
         ]
     )
-    data = []
+    mat_data = []
     for m in tqdm(np.unique(co_df.mother)):
         values = co_df[(co_df.mother == m) & (co_df.crossover_sex == "maternal")][
             "n_crossover"
         ].values
-        data.append([m, m, np.nanmean(values), np.nanvar(values), cv(values)])
+        mat_data.append([m, m, np.nanmean(values), np.nanvar(values), cv(values)])
+    mat_df = pd.DataFrame(mat_data)
+    mat_df.columns = ["FID", "IID", "MeanCO", "VarCO", "cvCO"]
+    pat_data = []
     for p in tqdm(np.unique(df.father)):
         values = co_df[(co_df.father == p) & (co_df.crossover_sex == "paternal")][
             "n_crossover"
         ].values
-        data.append([p, p, np.nanmean(values), np.nanvar(values), cv(values)])
-    out_df = pd.DataFrame(data)
-    out_df.columns = ["FID", "IID", "MeanCO", "VarCO", "cvCO"]
+        pat_data.append([p, p, np.nanmean(values), np.nanvar(values), cv(values)])
+    pat_df = pd.DataFrame(pat_data)
+    pat_df.columns = ["FID", "IID", "MeanCO", "VarCO", "cvCO"]
+    if randomize:
+        np.random.seed(seed)
+        pat_df["RandMeanCO"] = np.random.permutation(pat_df["MeanCO"].values)
+        mat_df["RandMeanCO"] = np.random.permutation(mat_df["MeanCO"].values)
+    out_df = pd.concat([mat_df, pat_df])
     return out_df
 
 
@@ -66,5 +80,5 @@ if __name__ == "__main__":
     rand_df = random_pheno(co_df)
     merged_df = mean_R_df.merge(rand_df)
     if snakemake.params["plink_format"]:
-        merged_df.rename(columns={"FID": "#FID"})
+        merged_df.rename(columns={"FID": "#FID"}, inplace=True)
     merged_df.to_csv(snakemake.output["pheno"], sep="\t", index=None)

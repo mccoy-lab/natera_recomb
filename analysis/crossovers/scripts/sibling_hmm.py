@@ -7,87 +7,7 @@ import numpy as np
 import pandas as pd
 from karyohmm import MetaHMM, PhaseCorrect, QuadHMM
 from tqdm import tqdm
-
-
-def load_baf_data(baf_pkls):
-    """Load in the multiple BAF datasets."""
-    family_data = {}
-    for fp in baf_pkls:
-        embryo_name = Path(fp).stem.split(".")[0]
-        with gz.open(fp, "rb") as f:
-            data = pickle.load(f)
-            family_data[embryo_name] = data
-    return family_data
-
-
-def euploid_per_chrom(aneuploidy_df, names, chrom="chr1"):
-    """Return only the euploid embryo names for this chromosome."""
-    assert "bf_max_cat" in aneuploidy_df.columns
-    assert "mother" in aneuploidy_df.columns
-    assert "father" in aneuploidy_df.columns
-    assert "child" in aneuploidy_df.columns
-    assert len(names) > 1
-    filt_names = aneuploidy_df[
-        (aneuploidy_df.child.isin(names))
-        & (aneuploidy_df.chrom == chrom)
-        & (aneuploidy_df.bf_max_cat == "2")
-    ].child.values
-    if filt_names.size < 3:
-        return []
-    else:
-        return filt_names.tolist()
-
-
-def prep_data(family_dict, names, chrom="chr21"):
-    """Prepare the data for the chromosome to have the same length in BAF across all samples."""
-    shared_pos = []
-    for k in family_dict.keys():
-        if k in names:
-            shared_pos.append(family_dict[k][chrom]["pos"])
-    collective_pos = list(set(shared_pos[0]).intersection(*shared_pos))
-    bafs = []
-    real_names = []
-    for k in family_dict.keys():
-        if k in names:
-            cur_pos = family_dict[k][chrom]["pos"]
-            baf = family_dict[k][chrom]["baf_embryo"]
-            idx = np.isin(cur_pos, collective_pos)
-            bafs.append(baf[idx])
-            mat_haps = family_dict[k][chrom]["mat_haps"][:, idx]
-            pat_haps = family_dict[k][chrom]["pat_haps"][:, idx]
-            real_names.append(k)
-    pos = np.sort(collective_pos)
-    return mat_haps, pat_haps, bafs, real_names, pos
-
-
-def find_nearest_het(idx, pos, haps):
-    """Find the nearest heterozygotes to the estimated crossover position."""
-    assert idx > 0 and idx < haps.shape[1]
-    assert pos.size == haps.shape[1]
-    geno_focal = haps[0, :] + haps[1, :]
-    het_idx = np.where((geno_focal == 1))[0]
-    if idx < np.min(het_idx):
-        left_pos = np.nan
-        left_idx = np.nan
-    else:
-        try:
-            left_idx = het_idx[het_idx < idx][-1]
-            left_pos = pos[left_idx]
-        except IndexError:
-            # For recombinations at the very beginning of chromosomes
-            left_idx = 0
-            left_pos = pos[0]
-    if idx > np.max(het_idx):
-        right_idx = np.nan
-        right_pos = np.nan
-    else:
-        try:
-            right_idx = het_idx[het_idx >= idx][0]
-            right_pos = pos[right_idx]
-        except IndexError:
-            right_idx = pos.size - 1
-            right_pos = pos[-1]
-    return left_idx, left_pos, right_idx, right_pos
+from utils import *
 
 
 if __name__ == "__main__":
@@ -100,52 +20,69 @@ if __name__ == "__main__":
     recomb_dict = {}
     lines = []
     for c in tqdm(snakemake.params["chroms"]):
-        cur_names = euploid_per_chrom(aneuploidy_df, names, chrom=c)
+        cur_names = euploid_per_chrom(
+            aneuploidy_df,
+            mother=snakemake.wildcards["mother"],
+            father=snakemake.wildcards["father"],
+            names=names,
+            chrom=c,
+            pp_thresh=snakemake.params["ppThresh"],
+        )
         mat_haps, pat_haps, bafs, real_names, pos = prep_data(
             family_dict=family_data, chrom=c, names=cur_names
         )
         nsibs = len(real_names)
         if nsibs >= 3:
-            pi0_ests = np.zeros(nsibs)
-            sigma_ests = np.zeros(nsibs)
-            for i in range(nsibs):
-                pi0_est, sigma_est = hmm_dis.est_sigma_pi0(
-                    bafs=bafs[i][::5],
-                    mat_haps=mat_haps[:, ::5],
-                    pat_haps=pat_haps[:, ::5],
-                    algo="Powell",
-                    r=1e-4,
-                )
-                pi0_ests[i] = pi0_est
-                sigma_ests[i] = sigma_est
-            # Apply the phase correction method here ...
-            phase_correct = PhaseCorrect(mat_haps=mat_haps, pat_haps=pat_haps)
+            phase_correct = PhaseCorrect(mat_haps=mat_haps, pat_haps=pat_haps, pos=pos)
             phase_correct.add_baf(bafs)
-            phase_correct.phase_correct(
-                pi0=np.median(pi0_ests), std_dev=np.median(sigma_ests)
-            )
-            phase_correct.phase_correct(
-                maternal=False, pi0=np.median(pi0_ests), std_dev=np.median(sigma_ests)
-            )
+            # NOTE: we should use these estimates from the previous HMM runs rather than re-estimating ...
+            if snakemake.params["use_prev_params"]:
+                pi0_est_acc, sigma_est_acc = extract_parameters(
+                    aneuploidy_df,
+                    mother=snakemake.wildcards["mother"],
+                    father=snakemake.wildcards["father"],
+                    names=real_names,
+                    chrom=c,
+                )
+                phase_correct.embryo_pi0s = pi0_est_acc
+                phase_correct.embryo_sigmas = sigma_est_acc
+            else:
+                phase_correct.est_sigma_pi0s()
+            (
+                mat_haps,
+                pat_haps,
+                n_mis_mat_tot,
+                n_mis_pat_tot,
+            ) = phase_correct.viterbi_phase_correct(niter=2)
+            pi0_ests = phase_correct.embryo_pi0s
+            sigma_ests = phase_correct.embryo_sigmas
             recomb_dict[c] = {}
+            # Use the least noisy siblings to help with estimation here ...
+            idxs = np.argsort(sigma_ests)
             for i in range(nsibs):
                 paths0 = []
-                for j in range(nsibs):
+                for j in idxs:
                     if j != i:
-                        path_ij = hmm.map_path(
-                            bafs=[bafs[i], bafs[j]],
+                        path_ij = hmm.viterbi_path(
+                            bafs=[
+                                phase_correct.embryo_bafs[i],
+                                phase_correct.embryo_bafs[j],
+                            ],
+                            pos=phase_correct.pos,
                             mat_haps=phase_correct.mat_haps_fixed,
                             pat_haps=phase_correct.pat_haps_fixed,
-                            pi0=pi0_ests[i],
-                            std_dev=sigma_ests[i],
-                            r=1e-18,
+                            pi0=(pi0_ests[i], pi0_ests[j]),
+                            std_dev=(sigma_ests[i], sigma_ests[j]),
+                            r=1e-8,
                         )
                         paths0.append(path_ij)
                         # This ensures that the largest families still have reasonable runtimes
-                        if len(paths0) > 5:
+                        if len(paths0) > 2:
                             break
                 # Isolate the recombinations here ...
-                mat_rec, pat_rec, _, _ = hmm.isolate_recomb(paths0[0], paths0[1:])
+                mat_rec, pat_rec, _, _ = hmm.isolate_recomb(
+                    paths0[0], paths0[1:], window=50
+                )
                 recomb_dict[c][f"{real_names[i]}"] = {
                     "pos": pos,
                     "paths": paths0,
@@ -167,6 +104,15 @@ if __name__ == "__main__":
                     rec_pos = pos[p]
                     lines.append(
                         f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tpaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{pi0_ests[i]}\t{sigma_ests[i]}\n'
+                    )
+                # NOTE: Cases of no crossover recombination detected as well ...
+                if mat_rec is []:
+                    lines.append(
+                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tmaternal\t{nan}\t{nan}\t{nan}\t{pi0_ests[i]}\t{sigma_ests[i]}\n'
+                    )
+                if pat_rec is []:
+                    lines.append(
+                        f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tpaternal\t{nan}\t{nan}\t{nan}\t{pi0_ests[i]}\t{sigma_ests[i]}\n'
                     )
         else:
             pass
