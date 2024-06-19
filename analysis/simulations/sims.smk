@@ -173,7 +173,6 @@ rule collect_crossover_results:
         tot_df = pd.concat(dfs)
         tot_df.to_csv(output.tsv, sep="\t", index=None)
 
-
 # ------ Experiment: Phase Correction -------- #
 rule evaluate_phase_correction:
     input:

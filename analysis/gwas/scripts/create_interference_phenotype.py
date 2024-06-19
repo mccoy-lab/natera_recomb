@@ -17,7 +17,6 @@ from tqdm import tqdm
 
 xoi = importr("xoi")
 
-
 def est_eta_nu_params(xolocs, chrom_lens):
     """Estimate MLE parameters for crossover-interference in the Housworth-Stahl model for a single individual."""
 

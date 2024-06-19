@@ -112,6 +112,7 @@ if Path("results/natera_inference_trisomy/valid_trisomies.tsv").is_file():
                 )
 
 
+
 # ------- Rules Section ------- #
 localrules:
     all,

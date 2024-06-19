@@ -89,7 +89,7 @@ rule interpolate_co_locations:
     script:
         "scripts/interp_recmap.py"
 
-
+        
 rule intersect_w_metadata:
     """Intersect the crossover data with the resulting metadata."""
     input:
@@ -173,7 +173,6 @@ rule age_sex_stratified_co_interference:
         seed=42,
     script:
         "scripts/est_age_strat_xo.py"
-
 
 # ------- Analysis 3. Posterior estimates of CO-interference across individuals. ------- #
 
