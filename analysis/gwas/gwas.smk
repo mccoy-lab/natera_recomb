@@ -238,7 +238,7 @@ rule create_hotspot_phenotypes:
     script:
         "scripts/create_hotspot_phenotypes.py"
 
-
+        
 rule create_rec_location_phenotypes:
     """Create the full quantitative phenotype."""
     input:

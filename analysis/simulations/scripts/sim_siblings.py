@@ -5,6 +5,7 @@ from karyohmm import PGTSim
 
 if __name__ == "__main__":
     pgt_sim = PGTSim()
+
     if snakemake.params["sfs"] != "None":
         # Estimate the simulated allele frequency parameters
         afs = np.loadtxt(snakemake.params["sfs"])

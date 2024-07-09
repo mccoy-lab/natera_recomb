@@ -22,7 +22,6 @@ def telomere_dist(chrom, pos, telomere_dict):
     dist = np.min(np.abs(pos - pts))
     return dist
 
-
 def rt_dict(rt_df):
     """Generating chromosome-specific interpolation functions for replication timing."""
     assert "chrom" in rt_df.columns
