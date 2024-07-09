@@ -43,11 +43,11 @@ localrules:
 
 rule all:
     input:
-        expand(
-            "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.rsids.tsv",
-            format="plink2",
-            project_name=config["project_name"],
-        ),
+        # expand(
+            # "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.rsids.tsv",
+            # format="plink2",
+            # project_name=config["project_name"],
+        # ),
         expand(
             "results/gwas_output/{format}/{project_name}_{sex}_{format}_{pheno}.regenie.gz",
             format="regenie",
@@ -366,7 +366,7 @@ rule regenie_step1:
     output:
         include_snps="results/gwas_output/regenie/predictions/{project_name}_{sex}_{format}.prune.in",
         exclude_snps=temp(
-            "results/gwas_output/regenie/predictions/{project_name}_{sex}_{format}_prune.out"
+            "results/gwas_output/regenie/predictions/{project_name}_{sex}_{format}.prune.out"
         ),
         loco_list="results/gwas_output/regenie/predictions/{project_name}_{sex}_{format}_pred.list",
         prs_list="results/gwas_output/regenie/predictions/{project_name}_{sex}_{format}_prs.list",
