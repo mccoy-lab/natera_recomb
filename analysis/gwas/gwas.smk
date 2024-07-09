@@ -48,13 +48,13 @@ rule all:
             format="plink2",
             project_name=config["project_name"],
         ),
-
-
-#         expand(
-# "results/h2/h2sq_{mode}/h2_est_total/{project_name}.total.hsq",
-# project_name=config["project_name"],
-# mode=["chrom"],
-#         ),
+        expand(
+            "results/gwas_output/{format}/{project_name}_{sex}_{format}_{pheno}.regenie.gz",
+            format="regenie",
+            sex=["Male", "Female", "Joint"],
+            project_name=config["project_name"],
+            pheno=phenotypes,
+        ),
 
 
 # ------- 0. Preprocess Genetic data ------- #
@@ -238,7 +238,7 @@ rule create_hotspot_phenotypes:
     script:
         "scripts/create_hotspot_phenotypes.py"
 
-        
+
 rule create_rec_location_phenotypes:
     """Create the full quantitative phenotype."""
     input:
@@ -364,6 +364,10 @@ rule regenie_step1:
         covar="results/covariates/{project_name}.covars.{format}.txt",
         sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
     output:
+        include_snps="results/gwas_output/regenie/predictions/{project_name}_{sex}_{format}.prune.in",
+        exclude_snps=temp(
+            "results/gwas_output/regenie/predictions/{project_name}_{sex}_{format}_prune.out"
+        ),
         loco_list="results/gwas_output/regenie/predictions/{project_name}_{sex}_{format}_pred.list",
         prs_list="results/gwas_output/regenie/predictions/{project_name}_{sex}_{format}_prs.list",
     resources:
@@ -376,7 +380,8 @@ rule regenie_step1:
         outfix=lambda wildcards: f"results/gwas_output/regenie/predictions/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}",
     shell:
         """
-        regenie --step 1 --pgen results/pgen_input/{wildcards.project_name} --covarFile {input.covar} --phenoFile {input.pheno} --remove {input.sex_exclusion} --bsize 200 --apply-rint --print-prs --threads {threads} --lowmem --lowmem-prefix tmp_rg --out {params.outfix}
+        plink2 --pfile results/pgen_input/{wildcards.project_name} --threads {threads} --maf 0.005 --memory 9000 --indep-pairwise 200 25 0.4 --out {params.outfix}
+        regenie --step 1 --pgen results/pgen_input/{wildcards.project_name} --extract {output.include_snps} --covarFile {input.covar} --phenoFile {input.pheno} --remove {input.sex_exclusion} --bsize 200 --apply-rint --print-prs --threads {threads} --lowmem --lowmem-prefix tmp_rg --out {params.outfix}
         """
 
 
