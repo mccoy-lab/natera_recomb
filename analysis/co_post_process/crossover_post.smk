@@ -33,11 +33,16 @@ rule all:
 rule filter_co_dataset:
     """Filter a crossover dataset according to the primary criteria."""
     input:
-        crossover_data=lambda wildcards: config["crossover_data"][wildcards.name],
+        crossover_data=lambda wildcards: config["crossover_data"][wildcards.name][
+            "crossover_calls"
+        ],
     output:
         co_filt_data="results/{name}.crossover_filt.tsv.gz",
+        co_raw_data="results/{name}.crossover_raw.tsv.gz",
     params:
-        qual_thresh=0.95,
+        qual_thresh=lambda wildcards: config["crossover_data"][wildcards.name][
+            "qual_thresh"
+        ],
     run:
         co_df = pl.read_csv(input.crossover_data, separator="\t")
         co_df = co_df.with_columns(
@@ -62,6 +67,8 @@ rule filter_co_dataset:
         )
         with gzip.open(output.co_filt_data, "wb") as f:
             valid_co_df.write_csv(f, separator="\t")
+        with gzip.open(output.co_raw_data, "wb") as fp:
+            co_df.write_csv(fp, separator="\t")
 
 
 rule isolate_euploid_crossovers:
@@ -89,7 +96,7 @@ rule interpolate_co_locations:
     script:
         "scripts/interp_recmap.py"
 
-        
+
 rule intersect_w_metadata:
     """Intersect the crossover data with the resulting metadata."""
     input:
@@ -173,6 +180,7 @@ rule age_sex_stratified_co_interference:
         seed=42,
     script:
         "scripts/est_age_strat_xo.py"
+
 
 # ------- Analysis 3. Posterior estimates of CO-interference across individuals. ------- #
 
