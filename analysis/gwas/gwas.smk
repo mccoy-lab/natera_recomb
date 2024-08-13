@@ -44,9 +44,9 @@ localrules:
 rule all:
     input:
         # expand(
-            # "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.rsids.tsv",
-            # format="plink2",
-            # project_name=config["project_name"],
+        # "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.rsids.tsv",
+        # format="plink2",
+        # project_name=config["project_name"],
         # ),
         expand(
             "results/gwas_output/{format}/{project_name}_{sex}_{format}_{pheno}.regenie.gz",
@@ -410,6 +410,23 @@ rule regenie_step2:
         """
         regenie --step 2 --pgen results/pgen_input/{wildcards.project_name} --covarFile {input.covar} --phenoFile {input.pheno} --pred {input.loco_pred} --remove {input.sex_exclusion} --bsize 200 --apply-rint --threads {threads} --lowmem --lowmem-prefix tmp_rg --gz --out results/gwas_output/regenie/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}
         """
+
+
+rule convert2plink_format:
+    """Convert regenie marginal summary stats to plink format for clumping and loci identification."""
+    input:
+        regenie="results/gwas_output/{format}/{project_name}_{sex}_{format}_{pheno}.regenie.gz",
+    output:
+        regenie2plink="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
+    wildcard_constraints:
+        format="regenie",
+    resources:
+        time="1:00:00",
+        mem_mb="10G",
+    shell:
+        """
+       zcat {input} | awk \'NR==1 {{print "#CHROM\tPOS\tID\tREF\tALT\tA1\tA1_FREQ\tTEST\tOBS_CT\tBETA\tSE\tT_STAT\tP"}} NR > 1 {{OFS="\t"; print $1,$2,$3,$4,$5,$5,$6,$8,$7,$9,$10,$11,10**(-$12)}}\' > {output.regenie2plink}
+       """
 
 
 # ------ 4. Run GWAS using Plink2 across phenotypes w. GC correction. ------ #
