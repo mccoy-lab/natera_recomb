@@ -43,17 +43,10 @@ localrules:
 
 rule all:
     input:
-        # expand(
-        # "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.rsids.tsv",
-        # format="plink2",
-        # project_name=config["project_name"],
-        # ),
         expand(
-            "results/gwas_output/{format}/{project_name}_{sex}_{format}_{pheno}.regenie.gz",
-            format="regenie",
-            sex=["Male", "Female", "Joint"],
+            "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.rsids.tsv",
+            format=["plink2", "regenie"],
             project_name=config["project_name"],
-            pheno=phenotypes,
         ),
 
 
@@ -485,7 +478,7 @@ rule plink_clumping:
         pgen="results/pgen_input/{project_name}.pgen",
         psam="results/pgen_input/{project_name}.psam",
         pvar="results/pgen_input/{project_name}.pvar",
-        sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
+        sex_exclusion="results/covariates/{project_name}.{sex}.plink2.exclude.txt",
         gwas_results="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
     output:
         "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.clumps",
@@ -493,8 +486,6 @@ rule plink_clumping:
         time="1:00:00",
         mem_mb="10G",
     threads: 8
-    wildcard_constraints:
-        format="plink2",
     params:
         outfix=lambda wildcards: f"results/gwas_output/{wildcards.format}/clumped/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}.{wildcards.pheno}",
         pval=1e-5,
@@ -599,8 +590,6 @@ rule combine_gwas_effect_size_afreq:
     resources:
         time="1:00:00",
         mem_mb="8G",
-    wildcard_constraints:
-        format="plink2",
     script:
         "scripts/combine_freq_clump_plink.py"
 
