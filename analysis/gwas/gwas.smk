@@ -48,6 +48,14 @@ rule all:
             format=["plink2", "regenie"],
             project_name=config["project_name"],
         ),
+        expand(
+            "results/h2/h2sq_ldms/h2_est_total/{project_name}.total.hsq",
+            project_name=config["project_name"],
+        ),
+        expand(
+            "results/h2/h2sq_chrom/h2_est_total/{project_name}.total.hsq",
+            project_name=config["project_name"],
+        ),
 
 
 # ------- 0. Preprocess Genetic data ------- #
