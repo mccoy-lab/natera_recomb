@@ -15,6 +15,7 @@ configfile: "config.yaml"
 # Create the VCF data dictionary for each chromosome ...
 vcf_dict = {}
 chroms = [f"chr{i}" for i in range(1, 24)]
+autosomes = [f"chr{i}" for i in range(1, 23)]
 for chrom in chroms:
     vcf_dict[chrom] = (
         f"{config['datadir']}spectrum_imputed_{chrom}_rehead_filter_cpra.vcf.gz"
@@ -751,7 +752,7 @@ rule collapse_per_chrom_h2:
     input:
         hsq_files=expand(
             "results/h2/h2sq_chrom/h2_est/{{project_name}}.{{sex}}.{chrom}.{{pheno}}.hsq",
-            chrom=chroms,
+            chrom=autosomes,
         ),
     output:
         h2sq_tsv="results/h2/h2sq_chrom/h2_est_total/{project_name}.{sex}.{pheno}.hsq",
@@ -821,7 +822,7 @@ rule partition_ld_scores:
     input:
         expand(
             "results/h2/h2sq_ldms/ld_score/{{project_name}}.{chrom}.score.ld",
-            chrom=[f"chr{i}" for i in range(1, 23)],
+            chrom=autosomes,
         ),
     output:
         ld_maf_partition="results/h2/h2sq_ldms/ld_score/{project_name}.ld_{p}.maf_{i}.txt",
