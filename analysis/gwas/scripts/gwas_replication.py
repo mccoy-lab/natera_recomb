@@ -28,7 +28,7 @@ if __name__ == "__main__":
         .str.split(" ")
         .list.get(1)
         .alias("Gene"),
-        (pl.col("P") < 0.05 / 7215119).alias("Bonferroni"),
+        (pl.col("P") < 0.05 / 7455197).alias("Bonferroni"),
     ).sort(pl.col("P"))
     # 2. Read in the replication dataset!
     haldorsson_df = pl.read_csv(snakemake.input["replication"])

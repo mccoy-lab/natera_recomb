@@ -15,6 +15,7 @@ configfile: "config.yaml"
 # Create the VCF data dictionary for each chromosome ...
 vcf_dict = {}
 chroms = [f"chr{i}" for i in range(1, 24)]
+autosomes = [f"chr{i}" for i in range(1, 23)]
 for chrom in chroms:
     vcf_dict[chrom] = (
         f"{config['datadir']}spectrum_imputed_{chrom}_rehead_filter_cpra.vcf.gz"
@@ -45,16 +46,17 @@ rule all:
     input:
         expand(
             "results/gwas_output/{format}/finalized/{project_name}.sumstats.replication.rsids.tsv",
-            format="plink2",
+            format=["plink2", "regenie"],
             project_name=config["project_name"],
         ),
-
-
-#         expand(
-# "results/h2/h2sq_{mode}/h2_est_total/{project_name}.total.hsq",
-# project_name=config["project_name"],
-# mode=["chrom"],
-#         ),
+        expand(
+            "results/h2/h2sq_ldms/h2_est_total/{project_name}.total.hsq",
+            project_name=config["project_name"],
+        ),
+        expand(
+            "results/h2/h2sq_chrom/h2_est_total/{project_name}.total.hsq",
+            project_name=config["project_name"],
+        ),
 
 
 # ------- 0. Preprocess Genetic data ------- #
@@ -238,7 +240,7 @@ rule create_hotspot_phenotypes:
     script:
         "scripts/create_hotspot_phenotypes.py"
 
-        
+
 rule create_rec_location_phenotypes:
     """Create the full quantitative phenotype."""
     input:
@@ -364,6 +366,10 @@ rule regenie_step1:
         covar="results/covariates/{project_name}.covars.{format}.txt",
         sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
     output:
+        include_snps="results/gwas_output/regenie/predictions/{project_name}_{sex}_{format}.prune.in",
+        exclude_snps=temp(
+            "results/gwas_output/regenie/predictions/{project_name}_{sex}_{format}.prune.out"
+        ),
         loco_list="results/gwas_output/regenie/predictions/{project_name}_{sex}_{format}_pred.list",
         prs_list="results/gwas_output/regenie/predictions/{project_name}_{sex}_{format}_prs.list",
     resources:
@@ -376,7 +382,8 @@ rule regenie_step1:
         outfix=lambda wildcards: f"results/gwas_output/regenie/predictions/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}",
     shell:
         """
-        regenie --step 1 --pgen results/pgen_input/{wildcards.project_name} --covarFile {input.covar} --phenoFile {input.pheno} --remove {input.sex_exclusion} --bsize 200 --apply-rint --print-prs --threads {threads} --lowmem --lowmem-prefix tmp_rg --out {params.outfix}
+        plink2 --pfile results/pgen_input/{wildcards.project_name} --threads {threads} --maf 0.005 --memory 9000 --indep-pairwise 200 25 0.4 --out {params.outfix}
+        regenie --step 1 --pgen results/pgen_input/{wildcards.project_name} --extract {output.include_snps} --covarFile {input.covar} --phenoFile {input.pheno} --remove {input.sex_exclusion} --bsize 200 --apply-rint --print-prs --threads {threads} --lowmem --lowmem-prefix tmp_rg --out {params.outfix}
         """
 
 
@@ -405,6 +412,23 @@ rule regenie_step2:
         """
         regenie --step 2 --pgen results/pgen_input/{wildcards.project_name} --covarFile {input.covar} --phenoFile {input.pheno} --pred {input.loco_pred} --remove {input.sex_exclusion} --bsize 200 --apply-rint --threads {threads} --lowmem --lowmem-prefix tmp_rg --gz --out results/gwas_output/regenie/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}
         """
+
+
+rule convert2plink_format:
+    """Convert regenie marginal summary stats to plink format for clumping and loci identification."""
+    input:
+        regenie="results/gwas_output/{format}/{project_name}_{sex}_{format}_{pheno}.regenie.gz",
+    output:
+        regenie2plink="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
+    wildcard_constraints:
+        format="regenie",
+    resources:
+        time="1:00:00",
+        mem_mb="10G",
+    shell:
+        """
+       zcat {input} | awk \'NR==1 {{print "#CHROM\tPOS\tID\tREF\tALT\tA1\tA1_FREQ\tTEST\tOBS_CT\tBETA\tSE\tT_STAT\tP"}} NR > 1 {{OFS="\t"; print $1,$2,$3,$4,$5,$5,$6,$8,$7,$9,$10,$11,10**(-$12)}}\' > {output.regenie2plink}
+       """
 
 
 # ------ 4. Run GWAS using Plink2 across phenotypes w. GC correction. ------ #
@@ -463,7 +487,6 @@ rule plink_clumping:
         pgen="results/pgen_input/{project_name}.pgen",
         psam="results/pgen_input/{project_name}.psam",
         pvar="results/pgen_input/{project_name}.pvar",
-        sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
         gwas_results="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
     output:
         "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.clumps",
@@ -471,8 +494,6 @@ rule plink_clumping:
         time="1:00:00",
         mem_mb="10G",
     threads: 8
-    wildcard_constraints:
-        format="plink2",
     params:
         outfix=lambda wildcards: f"results/gwas_output/{wildcards.format}/clumped/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}.{wildcards.pheno}",
         pval=1e-5,
@@ -577,8 +598,6 @@ rule combine_gwas_effect_size_afreq:
     resources:
         time="1:00:00",
         mem_mb="8G",
-    wildcard_constraints:
-        format="plink2",
     script:
         "scripts/combine_freq_clump_plink.py"
 
@@ -732,7 +751,7 @@ rule collapse_per_chrom_h2:
     input:
         hsq_files=expand(
             "results/h2/h2sq_chrom/h2_est/{{project_name}}.{{sex}}.{chrom}.{{pheno}}.hsq",
-            chrom=chroms,
+            chrom=autosomes,
         ),
     output:
         h2sq_tsv="results/h2/h2sq_chrom/h2_est_total/{project_name}.{sex}.{pheno}.hsq",
@@ -802,7 +821,7 @@ rule partition_ld_scores:
     input:
         expand(
             "results/h2/h2sq_ldms/ld_score/{{project_name}}.{chrom}.score.ld",
-            chrom=[f"chr{i}" for i in range(1, 23)],
+            chrom=autosomes,
         ),
     output:
         ld_maf_partition="results/h2/h2sq_ldms/ld_score/{project_name}.ld_{p}.maf_{i}.txt",

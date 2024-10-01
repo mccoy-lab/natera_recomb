@@ -1,6 +1,7 @@
 analysis/*/results*/
 analysis/*/logs/
 analysis/*/log/
+analysis/gwas/tmp*
 *.pdf
 *.png
 *.DS_Store

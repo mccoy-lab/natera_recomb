@@ -16,9 +16,9 @@ aneuploidy_calls = "/data/rmccoy22/natera_spectrum/karyohmm_outputs/compiled_out
 vcf_dict = {}
 chroms = [f"chr{i}" for i in range(1, 23)]
 for i, c in enumerate(range(1, 23)):
-    vcf_dict[
-        chroms[i]
-    ] = f"/data/rmccoy22/natera_spectrum/genotypes/opticall_parents_100423/genotypes/eagle_phased_hg38/natera_parents.b38.chr{c}.vcf.gz"
+    vcf_dict[chroms[i]] = (
+        f"/data/rmccoy22/natera_spectrum/genotypes/opticall_parents_100423/genotypes/eagle_phased_hg38/natera_parents.b38.chr{c}.vcf.gz"
+    )
 
 # Read in the aggregate metadata file
 meta_df = pd.read_csv(metadata_file)
@@ -110,7 +110,6 @@ if Path("results/natera_inference_trisomy/valid_trisomies.tsv").is_file():
                 total_trisomy_data.append(
                     f"results/natera_inference_trisomy/{m}+{f}+{c}.{chrom}.est_recomb_trisomy.tsv"
                 )
-
 
 
 # ------- Rules Section ------- #
@@ -212,20 +211,6 @@ def define_triplets_baf(
     res = []
     for c in filt_df.child.values:
         res.append(f"{base_path}/{mother_id}+{father_id}/{c}.bafs.pkl.gz")
-    return res
-
-
-def define_triplets_hmm(
-    mother_id,
-    father_id,
-    trio_file="results/natera_inference/valid_trios.triplets.txt",
-    base_path="/home/abiddan1/scratch16/natera_aneuploidy/analysis/aneuploidy/results/natera_inference",
-):
-    trio_df = pd.read_csv(trio_file, sep="\t")
-    filt_df = trio_df[(trio_df.mother == mother_id) & (trio_df.father == father_id)]
-    res = []
-    for c in filt_df.child.values:
-        res.append(f"{base_path}/{mother_id}+{father_id}/{c}.hmm_model.pkl.gz")
     return res
 
 

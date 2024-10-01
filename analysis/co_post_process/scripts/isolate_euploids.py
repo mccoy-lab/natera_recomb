@@ -19,7 +19,7 @@ def obtain_euploid_aneuploid(aneuploidy_fp, ppThresh=0.90, threads=8):
     aneuploidy_df = pl.read_csv(
         aneuploidy_fp,
         infer_schema_length=10000,
-        schema_overrides=karyohmm_dtypes,
+        dtypes=karyohmm_dtypes,
         n_threads=threads,
         null_values=["NA"],
         separator="\t",

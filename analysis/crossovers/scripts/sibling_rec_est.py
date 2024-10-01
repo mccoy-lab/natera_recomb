@@ -110,16 +110,22 @@ if __name__ == "__main__":
                         f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tpaternal\t{left_pos}\t{rec_pos}\t{right_pos}\t{geno_qual_left}\t{geno_qual_right}\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t{pat_rec_support[j]}\t{pos.size}\n'
                     )
                 # NOTE: Cases of no crossover recombination detected as well ...
-                if mat_rec is []:
+                if not mat_rec:
                     lines.append(
                         f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tmaternal\tNA\tNA\tNA\tNA\tNA\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t0\t{pos.size}\n'
                     )
-                if pat_rec is []:
+                if not pat_rec:
                     lines.append(
                         f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tpaternal\tNA\tNA\tNA\tNA\tNA\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t0\t{pos.size}\n'
                     )
         else:
-            pass
+            for i in range(nsibs):
+                lines.append(
+                    f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tmaternal\tNA\tNA\tNA\tNA\tNA\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t0\t{pos.size}\n'
+                )
+                lines.append(
+                    f'{snakemake.wildcards["mother"]}\t{snakemake.wildcards["father"]}\t{real_names[i]}\t{c}\tpaternal\tNA\tNA\tNA\tNA\tNA\t{pi0_ests[i]}\t{sigma_ests[i]}\t{nsibs}\t0\t{pos.size}\n'
+                )
     # Write out crossover location output here ...
     with open(snakemake.output["est_recomb"], "w") as out:
         out.write(
