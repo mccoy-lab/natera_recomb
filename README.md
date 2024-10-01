@@ -27,11 +27,11 @@ The overall pipeline relies on a number of data tables to perform inference prop
 
 This table details the output of the MetaHMM model from `karyohmm`, which returns chromosome-wide posterior probabilities of a chromosome being in a disomic or non-disomic state. The fields are better described in the `natera_aneuploidy` project.
 
-2. Crossover Table (Raw): `analysis/crossovers/results/test_crossover_heuristic.v30b.nsib_support.geno_qual.tsv.gz`
+2. Crossover Table (Raw): `/scratch16/rmccoy22/abiddan1/natera_recomb/analysis/crossovers/results/test_crossover_heuristic.v30b.nsib_support.geno_qual.tsv.gz`
 
 This table contains raw output of crossover calls from the pipeline (without any filtering based on local ploidy estimation) 
 
-3. Crossover Table (Filtered): `analysis/co_post_process/results/v30b_heuristic_90_nsib_qual.crossover_filt.deCode_haldorsson19.merged.meta.tsv.gz` 
+3. Crossover Table (Filtered): `/scratch16/rmccoy22/abiddan1/natera_recomb/analysis/co_post_process/results/v30b_heuristic_90_nsib_qual.crossover_filt.deCode_haldorsson19.merged.meta.tsv.gz` 
 
 This table contains an intersection with the Haldorsson et al data as well (to interpolate the genetic map lengths). The filters applied are:
 
