@@ -228,21 +228,6 @@ def define_triplets_hmm(
         res.append(f"{base_path}/{mother_id}+{father_id}/{c}.hmm_model.pkl.gz")
     return res
 
-
-def define_triplets_hmm(
-    mother_id,
-    father_id,
-    trio_file="results/natera_inference/valid_trios.triplets.txt",
-    base_path="/home/abiddan1/scratch16/natera_aneuploidy/analysis/aneuploidy/results/natera_inference",
-):
-    trio_df = pd.read_csv(trio_file, sep="\t")
-    filt_df = trio_df[(trio_df.mother == mother_id) & (trio_df.father == father_id)]
-    res = []
-    for c in filt_df.child.values:
-        res.append(f"{base_path}/{mother_id}+{father_id}/{c}.hmm_model.pkl.gz")
-    return res
-
-
 rule est_params_euploid_chrom_trio:
     """Estimate crossover events for euploid chromosomes in trio datasets."""
     input:
@@ -280,7 +265,7 @@ rule est_crossover_euploid_chrom_trio_heuristic:
         chroms=chroms,
         use_prev_params=True,
         ppThresh=0.90,
-        phaseCorrect=True,
+        phaseCorrect=False,
     resources:
         time="1:00:00",
         mem_mb="10G",
