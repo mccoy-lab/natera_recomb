@@ -18,23 +18,10 @@ chroms = [f"chr{i}" for i in range(1, 23)]
 rule all:
     input:
         expand(
-            "results/{name}/{sex}_genmap/{name}.events.{chrom}.{sex}.txt",
-            name=config["crossover_callset"].keys(),
-            sex="maternal",
-            chrom=["chr22"],
-        ),
-        expand(
-            "results/{name}/{sex}_genmap/{name}.nbmeioses.{chrom}.{sex}.{raw}.txt",
-            name=config["crossover_callset"].keys(),
-            sex="maternal",
-            chrom=["chr22"],
-            raw="raw",
-        ),
-        expand(
             "results/{name}/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-rates.txt",
             name=config["crossover_callset"].keys(),
-            sex="maternal",
-            chrom=["chr22"],
+            sex=["maternal", "paternal"],
+            chrom=chroms,
             raw="raw",
         ),
 
@@ -49,6 +36,8 @@ rule split_sex_specific_co_data:
     wildcard_constraints:
         sex="maternal|paternal",
         chrom="|".join(chroms),
+    resources:
+        mem_mb="10G",
     params:
         sex=lambda wildcards: wildcards.sex,
     script:
@@ -64,6 +53,8 @@ rule setup_intervals_co_data:
     wildcard_constraints:
         sex="maternal|paternal",
         raw="raw|split",
+    resources:
+        mem_mb="10G",
     params:
         sex=lambda wildcards: wildcards.sex,
         nsplit=5,
@@ -80,6 +71,9 @@ rule est_recomb_rate_rmcmc:
     output:
         rates_out="results/{name}/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-rates.txt",
         events_out="results/{name}/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-events.txt",
+    resources:
+        time="2:00:00",
+        mem_mb="5G",
     params:
         outfix=lambda wildcards: f"results/{wildcards.name}/{wildcards.sex}_genmap/{wildcards.name}.{wildcards.chrom}.{wildcards.sex}.{wildcards.raw}",
         nmeioses=lambda wildcards: pd.read_csv(
