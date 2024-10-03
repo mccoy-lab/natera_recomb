@@ -1,0 +1,3 @@
+metadata: "../../data/spectrum_metadata_merged.csv"
+crossover_callset:
+  merged_q90_sib_qual: '../co_post_process/results/v30b_heuristic_90_nsib_qual.crossover_filt.deCode_haldorsson19.merged.meta.tsv.gz'

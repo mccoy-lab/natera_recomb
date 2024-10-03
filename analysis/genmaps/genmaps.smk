@@ -17,18 +17,38 @@ chroms = [f"chr{i}" for i in range(1, 23)]
 
 rule all:
     input:
-        []
+        expand(
+            "results/{name}/{sex}_genmap/{name}.events.{chrom}.{sex}.txt",
+            name=config["crossover_callset"].keys(),
+            sex="maternal",
+            chrom=["chr22"],
+        ),
+        expand(
+            "results/{name}/{sex}_genmap/{name}.nbmeioses.{chrom}.{sex}.{raw}.txt",
+            name=config["crossover_callset"].keys(),
+            sex="maternal",
+            chrom=["chr22"],
+            raw="raw",
+        ),
+        expand(
+            "results/{name}/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-rates.txt",
+            name=config["crossover_callset"].keys(),
+            sex="maternal",
+            chrom=["chr22"],
+            raw="raw",
+        ),
 
 
 # ------- Analysis: Estimation of sex-specific recombination maps from crossover data ------ #
 rule split_sex_specific_co_data:
     """Splits crossovers into maternal/paternal events."""
     input:
-        co_map=config["filtered_crossovers"],
+        co_map=lambda wildcards: config["crossover_callset"][wildcards.name],
     output:
-        "results/{sex}_genmap/{name}.events.{chrom}.{sex}.txt",
+        events="results/{name}/{sex}_genmap/{name}.events.{chrom}.{sex}.txt",
     wildcard_constraints:
         sex="maternal|paternal",
+        chrom="|".join(chroms),
     params:
         sex=lambda wildcards: wildcards.sex,
     script:
@@ -38,9 +58,9 @@ rule split_sex_specific_co_data:
 rule setup_intervals_co_data:
     """Setup intervals on which to estimate recombination rates."""
     input:
-        co_map="results/{name}.crossover_filt.tsv.gz",
+        co_map=lambda wildcards: config["crossover_callset"][wildcards.name],
     output:
-        "results/{sex}_genmap/{name}.nbmeioses.{chrom}.{sex}.{raw}.txt",
+        nbmeioses="results/{name}/{sex}_genmap/{name}.nbmeioses.{chrom}.{sex}.{raw}.txt",
     wildcard_constraints:
         sex="maternal|paternal",
         raw="raw|split",
@@ -54,16 +74,16 @@ rule setup_intervals_co_data:
 
 rule est_recomb_rate_rmcmc:
     input:
-        events_file="results/{sex}_genmap/{name}.events.{chrom}.{sex}.txt",
-        nbmeioses_file="results/{sex}_genmap/{name}.nbmeioses.{chrom}.{sex}.{raw}.txt",
+        events_file="results/{name}/{sex}_genmap/{name}.events.{chrom}.{sex}.txt",
+        nbmeioses_file="results/{name}/{sex}_genmap/{name}.nbmeioses.{chrom}.{sex}.{raw}.txt",
         rMCMC="./rMCMC/rMCMC/rMCMC",
     output:
-        rates_out="results/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-rates.txt",
-        events_out="results/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-events.txt",
+        rates_out="results/{name}/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-rates.txt",
+        events_out="results/{name}/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-events.txt",
     params:
-        outfix=lambda wildcards: f"results/{wildcards.sex}_genmap/{wildcards.name}.{wildcards.chrom}.{wildcards.sex}.{wildcards.raw}",
+        outfix=lambda wildcards: f"results/{wildcards.name}/{wildcards.sex}_genmap/{wildcards.name}.{wildcards.chrom}.{wildcards.sex}.{wildcards.raw}",
         nmeioses=lambda wildcards: pd.read_csv(
-            f"results/{wildcards.sex}_genmap/{wildcards.name}.nbmeioses.{wildcards.chrom}.{wildcards.sex}.{wildcards.raw}.txt",
+            f"results/{wildcards.name}/{wildcards.sex}_genmap/{wildcards.name}.nbmeioses.{wildcards.chrom}.{wildcards.sex}.{wildcards.raw}.txt",
             nrows=1,
             sep="\s",
         ).values[:, 2][0],
