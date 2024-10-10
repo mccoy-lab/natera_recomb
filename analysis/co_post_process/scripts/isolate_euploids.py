@@ -82,7 +82,9 @@ def obtain_euploid_aneuploid(aneuploidy_fp, ppThresh=0.90, threads=8):
 if __name__ == "__main__":
     # Keep track at the chromosome -level the number of disomies able to be processed ...
     euploid_uids, aneuploid_uids = obtain_euploid_aneuploid(
-        snakemake.input["aneuploidy_tsv"], ppThresh=snakemake.params["ppThresh"], threads=snakemake.threads
+        snakemake.input["aneuploidy_tsv"],
+        ppThresh=snakemake.params["ppThresh"],
+        threads=snakemake.threads,
     )
     # Load in the crossover dataframe and isolate the euploid embryos
     co_df = pl.read_csv(snakemake.input["co_filt_tsv"], separator="\t")

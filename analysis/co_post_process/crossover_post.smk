@@ -22,11 +22,12 @@ rule all:
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
         ),
-        # expand(
-        #     "results/statistical_models/{name}.{recmap}.aneuploidy_effect_per_chrom.mean.tsv",
-        #     name=config["crossover_data"].keys(),
-        #     recmap=config["recomb_maps"].keys(),
-        # ),
+        expand(
+            "results/{name}.crossover_filt.{recmap}.crossover_count.{sex}.csv.gz",
+            name=config["crossover_data"].keys(),
+            recmap=config["recomb_maps"].keys(),
+            sex=["maternal", "paternal"],
+        ),
 
 
 # ---------------- Analysis 1a. Conduct preprocessing analyses. -------- #
@@ -96,7 +97,7 @@ rule interpolate_co_locations:
     script:
         "scripts/interp_recmap.py"
 
-        
+
 rule intersect_w_metadata:
     """Intersect the crossover data with the resulting metadata."""
     input:
@@ -108,6 +109,7 @@ rule intersect_w_metadata:
         co_meta_map_tsv="results/{name}.crossover_filt.{recmap}.{ploid}_only.meta.tsv.gz",
     run:
         import pandas as pd
+
         meta_df = pd.read_csv(input.meta_csv)
         meta_df["egg_donor_bool"] = meta_df.egg_donor == "yes"
         meta_df["sperm_donor_bool"] = meta_df.sperm_donor == "yes"
@@ -153,29 +155,13 @@ rule merge_euploid_aneuploid:
         merged_df.to_csv(output.merged_tsv, sep="\t", index=None)
 
 
-rule estimate_chrom_specific_aneuploidy_effect:
-    """Estimate the effects of multiple linear models."""
+rule estimate_crossover_counts:
     input:
-        merged_tsv="results/{name}.crossover_filt.{recmap}.merged.meta.tsv.gz",
+        crossover_fp=rules.merge_euploid_aneuploid.output.merged_tsv,
+        genmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
+        covariates=config["covariates"],
     output:
-        mean_per_chrom_effects="results/statistical_models/{name}.{recmap}.aneuploidy_effect_per_chrom.mean.tsv",
-        var_per_chrom_effects="results/statistical_models/{name}.{recmap}.aneuploidy_effect_per_chrom.var.tsv",
-    shell:
-        """
-        Rscript --vanilla scripts/aneuploidy_effect_per_chrom.R {input.merged_tsv} {output.mean_per_chrom_effects} {output.var_per_chrom_effects}
-        """
-
-
-# ------- Analysis 2. Estimate Crossover Interference Stratified by Age & Sex -------- #
-rule age_sex_stratified_co_interference:
-    input:
-        co_meta_map_tsv="results/{name}.crossover_filt.{recmap}.{ploid}_only.meta.tsv.gz",
-        recmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
-    output:
-        age_sex_interference="results/xo_interference/{name}.age_xo_interference.{recmap}.{chrom}.tsv",
-    params:
-        nbins=10,
-        nboots=5,
-        seed=42,
+        maternal_euploid="results/{name}.crossover_filt.{recmap}.crossover_count.maternal.csv.gz",
+        paternal_euploid="results/{name}.crossover_filt.{recmap}.crossover_count.paternal.csv.gz",
     script:
-        "scripts/est_age_strat_xo.py"
+        "scripts/gen_co_counts.py"

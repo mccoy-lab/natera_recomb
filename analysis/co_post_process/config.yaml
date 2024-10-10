@@ -7,5 +7,6 @@ crossover_data:
     v30b_heuristic_95_nsib_qual: 
       crossover_calls: '../crossovers/results/test_crossover_heuristic.v30b.nsib_support.geno_qual.tsv.gz'
       qual_thresh: 0.95
+covariates: '../gwas/results/covariates/natera_recombination_gwas.covars.regenie.txt'
 recomb_maps:
   deCode_haldorsson19: "../../data/genmaps/halldorsson19/aau1043_datas3.gz"
