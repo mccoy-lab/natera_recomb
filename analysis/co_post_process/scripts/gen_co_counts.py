@@ -39,6 +39,8 @@ if __name__ == "__main__":
             pl.col("patient_age").mean(),
             pl.col("egg_donor").first(),
             pl.col("sperm_donor").first(),
+            pl.col("avg_pi0").first(),
+            pl.col("avg_sigma").first()
         )
     )
 
@@ -83,6 +85,8 @@ if __name__ == "__main__":
             pl.col("partner_age").mean(),
             pl.col("egg_donor").first(),
             pl.col("sperm_donor").first(),
+            pl.col("avg_pi0").first(),
+            pl.col("avg_sigma").first()
         )
     )
 
