@@ -23,10 +23,11 @@ rule all:
             recmap=config["recomb_maps"].keys(),
         ),
         expand(
-            "results/{name}.crossover_filt.{recmap}.crossover_count.{sex}.csv.gz",
+            "results/{name}.crossover_filt.{recmap}.crossover_count.{sex}.{euploid}.csv.gz",
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
             sex=["maternal", "paternal"],
+            euploid=["euploid", "aneuploid"],
         ),
 
 
@@ -158,10 +159,15 @@ rule merge_euploid_aneuploid:
 rule estimate_crossover_counts:
     input:
         crossover_fp=rules.merge_euploid_aneuploid.output.merged_tsv,
+        aneuploidy_tsv=config["aneuploidy_data"],
         genmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
         covariates=config["covariates"],
     output:
-        maternal_euploid="results/{name}.crossover_filt.{recmap}.crossover_count.maternal.csv.gz",
-        paternal_euploid="results/{name}.crossover_filt.{recmap}.crossover_count.paternal.csv.gz",
+        maternal_co_count="results/{name}.crossover_filt.{recmap}.crossover_count.maternal.{euploid}.csv.gz",
+        paternal_co_count="results/{name}.crossover_filt.{recmap}.crossover_count.paternal.{euploid}.csv.gz",
+    wildcard_constraints:
+        euploid="euploid|aneuploid",
+    params:
+        euploid=lambda wildcards: wildcards.euploid == "euploid",
     script:
         "scripts/gen_co_counts.py"
