@@ -9,7 +9,7 @@ from io import StringIO
 
 
 # ---- Parameters for inference in Natera Data ---- #
-configfile: "config.yaml"
+# configfile: "config.yaml"
 
 
 # Create the VCF data dictionary for each chromosome ...
@@ -49,14 +49,14 @@ rule all:
             format=["plink2", "regenie"],
             project_name=config["project_name"],
         ),
-        expand(
-            "results/h2/h2sq_ldms/h2_est_total/{project_name}.total.hsq",
-            project_name=config["project_name"],
-        ),
-        expand(
-            "results/h2/h2sq_chrom/h2_est_total/{project_name}.total.hsq",
-            project_name=config["project_name"],
-        ),
+        # expand(
+            # "results/h2/h2sq_ldms/h2_est_total/{project_name}.total.hsq",
+            # project_name=config["project_name"],
+        # ),
+        # expand(
+            # "results/h2/h2sq_chrom/h2_est_total/{project_name}.total.hsq",
+            # project_name=config["project_name"],
+        # ),
 
 
 # ------- 0. Preprocess Genetic data ------- #
@@ -487,6 +487,7 @@ rule plink_clumping:
         pgen="results/pgen_input/{project_name}.pgen",
         psam="results/pgen_input/{project_name}.psam",
         pvar="results/pgen_input/{project_name}.pvar",
+        sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
         gwas_results="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
     output:
         "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.clumps",

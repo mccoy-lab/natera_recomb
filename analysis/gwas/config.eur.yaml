@@ -1,4 +1,4 @@
-project_name: "natera_recombination_gwas"
+project_name: "natera_recombination_gwas_eur"
 metadata: "../../data/spectrum_metadata_merged.csv"
 crossovers: "../co_post_process/results/v30b_heuristic_90_nsib_qual.crossover_filt.deCode_haldorsson19.euploid_only.meta.tsv.gz"
 recomb_map: "../../data/genmaps/halldorsson19/aau1043_datas3.gz"
@@ -14,7 +14,7 @@ bed_files:
     replication_timing: "/scratch4/rmccoy22/abiddan1/ipsc_replication_timing_data/iPSC_individual_level_data.averaged.hg38.bed"
 gwas_replication: "../../data/gwas/aau1043_datas6.total.csv"
 gencode: "/data/rmccoy22/resources/GENCODE/v38/gencode.v38.annotation.gtf.gz"
-datadir: "/data/rmccoy22/natera_spectrum/genotypes/imputed_parents_101823_cpra/"
+datadir: "/data/rmccoy22/natera_spectrum/genotypes/imputed_parents_101823_cpra/eur_only/"
 methods:
   - "plink2"
   - "regenie"
