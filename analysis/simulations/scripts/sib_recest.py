@@ -69,7 +69,7 @@ if __name__ == "__main__":
     for i in range(nsibs):
         # Isolate the recombinations here ...
         mat_rec, mat_rec_support = recomb_est.estimate_crossovers(
-            template_embryo=i, maternal=True
+            template_embryo=i, maternal=True,
         )
         pat_rec, pat_rec_support = recomb_est.estimate_crossovers(
             template_embryo=i, maternal=False

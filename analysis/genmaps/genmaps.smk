@@ -83,3 +83,13 @@ rule est_recomb_rate_rmcmc:
         ).values[:, 2][0],
     shell:
         "{input.rMCMC} -i {input.events_file} -nbmeioses {input.nbmeioses_file} -m {params.nmeioses} -o {params.outfix}"
+
+rule identify_mismatches:
+    """Isolate places in the map that are different between the sexes."""
+    input:
+       maternal_rates = "results/{name}/maternal_genmap/{name}.{chrom}.maternal.{raw}-rates.txt", 
+       paternal_rates = "results/{name}/paternal_genmap/{name}.{chrom}.paternal.{raw}-rates.txt", 
+    output:
+       differences = "results/{name}/genmap_diffs/{name}.{chrom}.{raw}-diff.txt" 
+    script:
+        "scripts/isolate_differences.py"

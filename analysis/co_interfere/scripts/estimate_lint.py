@@ -1,9 +1,13 @@
 #!python3
 
 """
-    Estimating a number of different crossover interference estimates.
+    Estimating different crossover interference estimates.
 """
 from measure_CO_interference import *
+
+def estimate_CO_interference():
+    pass
+
 
 
 if __name__ == '__main__':
