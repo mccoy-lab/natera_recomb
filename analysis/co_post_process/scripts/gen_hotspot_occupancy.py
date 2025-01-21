@@ -6,10 +6,10 @@ Based on proposed model from Coop et al 2008.
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from intervaltree import IntervalTree
 from scipy.stats import norm
 from tqdm import tqdm
-
 
 def create_co_intervals(co_df):
     """Store hotspot intervals in a dictionary of interval trees."""
@@ -116,17 +116,18 @@ def est_mle_alpha(p_overlaps, deltas, ngridpts=500):
 if __name__ == "__main__":
     """Actually do the full estimation routine across crossovers for each meiosis."""
 
-    co_df = pd.read_csv(snakemake.input["co_data"], sep="\t")
+    co_df = pd.read_csv(snakemake.input["crossover_fp"], sep="\t")
+    co_df = co_df.head(10000)
     male_hotspot_df = pd.read_csv(snakemake.input["male_hotspots"], sep="\t")
     female_hotspot_df = pd.read_csv(snakemake.input["female_hotspots"], sep="\t")
-    pratto_hotspot_df = pd.read_csv(snakemake.input["pratto_hotspots"], sep="\t")
+    # pratto_hotspot_df = pd.read_csv(snakemake.input["pratto_hotspots"], sep="\t")
 
     # Step 0: setup the parameters
     max_interval = snakemake.params["max_interval"]
     nreps = snakemake.params["nreps"]
     ngridpts = snakemake.params["ngridpts"]
 
-    # Step 1: Make a dictionary of the sex-specific hotspots from
+    # Step 1: Make a dictionary of the sex-specific hotspots from Halldorsson 2019
     co_hotspot_dict_male = create_co_intervals(male_hotspot_df)
     co_hotspot_dict_female = create_co_intervals(female_hotspot_df)
 
@@ -193,24 +194,5 @@ if __name__ == "__main__":
             "nco_pass_pat",
         ],
     )
-    # Step 4: Collapse all of these into a single phenotype file
-    raw_df = res_mat_df.merge(res_pat_df, on=["uid"])
-    tot_mat_df = res_mat_df.merge(co_df[["uid", "mother"]], how="left", on=["uid"])
-    tot_pat_df = res_pat_df.merge(co_df[["uid", "father"]], how="left", on=["uid"])
-    final_mat_df = (
-        tot_mat_df.groupby("mother")["mean_alpha_mat"]
-        .agg("mean")
-        .reset_index()[["mother", "mother", "mean_alpha_mat"]]
-    )
-    final_mat_df.columns = ["FID", "IID", "HotspotOccupancy"]
-    final_pat_df = (
-        tot_pat_df.groupby("father")["mean_alpha_pat"]
-        .agg("mean")
-        .reset_index()[["father", "father", "mean_alpha_pat"]]
-    )
-    final_pat_df.columns = ["FID", "IID", "HotspotOccupancy"]
-    merged_df = pd.concat([final_mat_df, final_pat_df])
-    if snakemake.params["plink_format"]:
-        merged_df.rename(columns={"FID": "#FID"}, inplace=True)
-    merged_df.to_csv(snakemake.output["pheno"], sep="\t", index=None)
-    raw_df.to_csv(snakemake.output["pheno_raw"], sep="\t", index=None)
+    res_mat_df.to_csv(snakemake.output["maternal_occupancy"], sep="\t", index=None)
+    res_pat_df.to_csv(snakemake.output["paternal_occupancy"], sep="\t", index=None)
