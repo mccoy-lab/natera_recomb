@@ -23,18 +23,12 @@ rule all:
             recmap=config["recomb_maps"].keys(),
         ),
         expand(
-            "results/{name}.crossover_filt.{recmap}.crossover_count.{sex}.{euploid}.csv.gz",
+            "results/{name}.crossover_filt.{recmap}.{datatype}.{sex}.{euploid}.csv.gz",
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
             sex=["maternal", "paternal"],
             euploid=["euploid", "aneuploid"],
-        ),
-        expand(
-            "results/{name}.crossover_filt.{recmap}.hotspot_occupy.{sex}.{euploid}.csv.gz",
-            name=config["crossover_data"].keys(),
-            recmap=config["recomb_maps"].keys(),
-            sex=["maternal", "paternal"],
-            euploid=["euploid", "aneuploid"],
+            datatype=["crossover_count", "hotspot_occupy", "centromere_telomere_dist"],
         ),
 
 
