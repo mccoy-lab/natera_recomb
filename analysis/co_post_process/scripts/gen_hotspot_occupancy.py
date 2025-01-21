@@ -10,6 +10,7 @@ import polars as pl
 from intervaltree import IntervalTree
 from scipy.stats import norm
 from tqdm import tqdm
+import gzip as gz
 
 
 def create_co_intervals(co_df):
@@ -118,7 +119,6 @@ if __name__ == "__main__":
     """Actually do the full estimation routine across crossovers for each meiosis."""
 
     co_df = pd.read_csv(snakemake.input["crossover_fp"], sep="\t")
-    co_df = co_df.head(5000)
     male_hotspot_df = pd.read_csv(snakemake.input["male_hotspots"], sep="\t")
     female_hotspot_df = pd.read_csv(snakemake.input["female_hotspots"], sep="\t")
     # pratto_hotspot_df = pd.read_csv(snakemake.input["pratto_hotspots"], sep="\t")
@@ -158,7 +158,16 @@ if __name__ == "__main__":
         deltas_prime = est_deltas(co_mat_calls, co_hotspot_dict_female)
         alphas = est_mle_alpha(p_overlaps_prime, deltas_prime, ngridpts=ngridpts)
         if len(co_mat_calls) > 0:
-            res_mat.append([u, alphas[0], alphas[1], alphas[2], len(co_mat_calls), 0])
+            res_mat.append(
+                [
+                    u,
+                    alphas[0],
+                    alphas[1],
+                    alphas[2],
+                    len(co_mat_calls),
+                    np.unique([x[0] for x in co_mat_calls]).size,
+                ]
+            )
         else:
             res_mat.append(
                 [
@@ -167,7 +176,7 @@ if __name__ == "__main__":
                     np.nan,
                     np.nan,
                     len(co_mat_calls),
-                    np.unique([x[0] for x in co_pat_calls]).size,
+                    0,
                 ]
             )
     res_mat_df = pd.DataFrame(
@@ -192,7 +201,16 @@ if __name__ == "__main__":
         deltas_prime = est_deltas(co_pat_calls, co_hotspot_dict_male)
         alphas = est_mle_alpha(p_overlaps_prime, deltas_prime, ngridpts=ngridpts)
         if len(co_pat_calls) > 0:
-            res_pat.append([u, alphas[0], alphas[1], alphas[2], len(co_pat_calls), 0])
+            res_pat.append(
+                [
+                    u,
+                    alphas[0],
+                    alphas[1],
+                    alphas[2],
+                    len(co_pat_calls),
+                    np.unique([x[0] for x in co_pat_calls]).size,
+                ]
+            )
         else:
             res_pat.append(
                 [
@@ -201,7 +219,7 @@ if __name__ == "__main__":
                     np.nan,
                     np.nan,
                     len(co_pat_calls),
-                    np.unique([x[0] for x in co_pat_calls]).size,
+                    0,
                 ]
             )
     res_pat_df = pd.DataFrame(
@@ -216,6 +234,7 @@ if __name__ == "__main__":
         ],
     )
     # Merge in data on covariates here using polars
+    co_df = pl.from_pandas(co_df)
     aneuploidy_df = pl.read_csv(
         snakemake.input["aneuploidy_tsv"], separator="\t", null_values=["NA"]
     )
@@ -255,11 +274,16 @@ if __name__ == "__main__":
         res_pat_df.join(
             co_df[["uid", "mother", "father", "child", "euploid"]].unique(), on=["uid"]
         )
-        .with_columns(pl.col("mother").alias("IID"))
+        .with_columns(pl.col("father").alias("IID"))
         .join(covar_df, on=["IID"])
     )
-
-    with gz.open(snakemake.output["maternal_occupancy"]) as mat_out:
-        res_mat_filt_df.write_csv(mat_out, null_values=["NA"])
-    with gz.open(snakemake.output["paternal_occupancy"]) as pat_out:
-        res_pat_filt_df.write_csv(pat_out, null_values=["NA"])
+    if snakemake.params["euploid"]:
+        res_pat_filt_df = res_pat_filt_df.filter(pl.col("euploid"))
+        res_mat_filt_df = res_mat_filt_df.filter(pl.col("euploid"))
+    else:
+        res_pat_filt_df = res_pat_filt_df.filter(~pl.col("euploid"))
+        res_mat_filt_df = res_mat_filt_df.filter(~pl.col("euploid"))
+    with gz.open(snakemake.output["maternal_occupancy"], "w+") as mat_out:
+        res_mat_filt_df.write_csv(mat_out, null_value="NA")
+    with gz.open(snakemake.output["paternal_occupancy"], "w+") as pat_out:
+        res_pat_filt_df.write_csv(pat_out, null_value="NA")

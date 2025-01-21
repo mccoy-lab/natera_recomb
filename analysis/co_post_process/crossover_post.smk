@@ -34,7 +34,7 @@ rule all:
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
             sex=["maternal", "paternal"],
-            euploid=["euploid"],
+            euploid=["euploid", "aneuploid"],
         ),
 
 
