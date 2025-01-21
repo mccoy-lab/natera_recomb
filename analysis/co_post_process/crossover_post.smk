@@ -171,3 +171,20 @@ rule estimate_crossover_counts:
         euploid=lambda wildcards: wildcards.euploid == "euploid",
     script:
         "scripts/gen_co_counts.py"
+
+
+rule estimate_centromere_telomere_dist:
+    input:
+        crossover_fp=rules.merge_euploid_aneuploid.output.merged_tsv,
+        aneuploidy_tsv=config["aneuploidy_data"],
+        genmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
+        covariates=config["covariates"],
+    output:
+        maternal_co_dist="results/{name}.crossover_filt.{recmap}.centromere_telomere_dist.maternal.{euploid}.csv.gz",
+        paternal_co_dist="results/{name}.crossover_filt.{recmap}.centromere_telomere_dist.paternal.{euploid}.csv.gz",
+    wildcard_constraints:
+        euploid="euploid|aneuploid",
+    params:
+        euploid=lambda wildcards: wildcards.euploid == "euploid",
+    script:
+        "scripts/gen_rec_location.py"
