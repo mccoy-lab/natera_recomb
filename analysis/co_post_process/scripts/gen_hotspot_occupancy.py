@@ -11,6 +11,7 @@ from intervaltree import IntervalTree
 from scipy.stats import norm
 from tqdm import tqdm
 
+
 def create_co_intervals(co_df):
     """Store hotspot intervals in a dictionary of interval trees."""
     assert "chrom" in co_df.columns
@@ -117,7 +118,7 @@ if __name__ == "__main__":
     """Actually do the full estimation routine across crossovers for each meiosis."""
 
     co_df = pd.read_csv(snakemake.input["crossover_fp"], sep="\t")
-    co_df = co_df.head(10000)
+    co_df = co_df.head(5000)
     male_hotspot_df = pd.read_csv(snakemake.input["male_hotspots"], sep="\t")
     female_hotspot_df = pd.read_csv(snakemake.input["female_hotspots"], sep="\t")
     # pratto_hotspot_df = pd.read_csv(snakemake.input["pratto_hotspots"], sep="\t")
@@ -157,9 +158,18 @@ if __name__ == "__main__":
         deltas_prime = est_deltas(co_mat_calls, co_hotspot_dict_female)
         alphas = est_mle_alpha(p_overlaps_prime, deltas_prime, ngridpts=ngridpts)
         if len(co_mat_calls) > 0:
-            res_mat.append([u, alphas[0], alphas[1], alphas[2], len(co_mat_calls)])
+            res_mat.append([u, alphas[0], alphas[1], alphas[2], len(co_mat_calls), 0])
         else:
-            res_mat.append([u, np.nan, np.nan, np.nan, len(co_mat_calls)])
+            res_mat.append(
+                [
+                    u,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    len(co_mat_calls),
+                    np.unique([x[0] for x in co_pat_calls]).size,
+                ]
+            )
     res_mat_df = pd.DataFrame(
         res_mat,
         columns=[
@@ -168,6 +178,7 @@ if __name__ == "__main__":
             "mean_alpha_mat",
             "upper_95_alpha_mat",
             "nco_pass_mat",
+            "nchrom",
         ],
     )
 
@@ -181,9 +192,18 @@ if __name__ == "__main__":
         deltas_prime = est_deltas(co_pat_calls, co_hotspot_dict_male)
         alphas = est_mle_alpha(p_overlaps_prime, deltas_prime, ngridpts=ngridpts)
         if len(co_pat_calls) > 0:
-            res_pat.append([u, alphas[0], alphas[1], alphas[2], len(co_pat_calls)])
+            res_pat.append([u, alphas[0], alphas[1], alphas[2], len(co_pat_calls), 0])
         else:
-            res_pat.append([u, np.nan, np.nan, np.nan, len(co_pat_calls)])
+            res_pat.append(
+                [
+                    u,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    len(co_pat_calls),
+                    np.unique([x[0] for x in co_pat_calls]).size,
+                ]
+            )
     res_pat_df = pd.DataFrame(
         res_pat,
         columns=[
@@ -192,7 +212,54 @@ if __name__ == "__main__":
             "mean_alpha_pat",
             "upper_95_alpha_pat",
             "nco_pass_pat",
+            "nchrom",
         ],
     )
-    res_mat_df.to_csv(snakemake.output["maternal_occupancy"], sep="\t", index=None)
-    res_pat_df.to_csv(snakemake.output["paternal_occupancy"], sep="\t", index=None)
+    # Merge in data on covariates here using polars
+    aneuploidy_df = pl.read_csv(
+        snakemake.input["aneuploidy_tsv"], separator="\t", null_values=["NA"]
+    )
+    aneuploidy_df = aneuploidy_df.with_columns(
+        pl.concat_str(
+            [
+                pl.col("mother"),
+                pl.col("father"),
+                pl.col("child"),
+            ],
+            separator="+",
+        ).alias("uid"),
+    )
+    genmap_df = pl.read_csv(
+        snakemake.input["genmap"], comment_prefix="#", separator="\t"
+    )
+    genlen_df = (
+        genmap_df.group_by(pl.col("Chr"))
+        .agg(pl.col("cM").max(), pl.col("End").max(), pl.col("Begin").min())
+        .with_columns((pl.col("End") - pl.col("Begin")).alias("seq_len"))
+        .rename({"Chr": "chrom", "cM": "cM_len"})
+        .sort("seq_len")
+    )
+    covar_df = pl.read_csv(
+        snakemake.input["covariates"], null_values="NA", separator="\t"
+    )
+    res_mat_df = pl.from_pandas(res_mat_df)
+    res_pat_df = pl.from_pandas(res_pat_df)
+    res_mat_filt_df = (
+        res_mat_df.join(
+            co_df[["uid", "mother", "father", "child", "euploid"]].unique(), on=["uid"]
+        )
+        .with_columns(pl.col("mother").alias("IID"))
+        .join(covar_df, on=["IID"])
+    )
+    res_pat_filt_df = (
+        res_pat_df.join(
+            co_df[["uid", "mother", "father", "child", "euploid"]].unique(), on=["uid"]
+        )
+        .with_columns(pl.col("mother").alias("IID"))
+        .join(covar_df, on=["IID"])
+    )
+
+    with gz.open(snakemake.output["maternal_occupancy"]) as mat_out:
+        res_mat_filt_df.write_csv(mat_out, null_values=["NA"])
+    with gz.open(snakemake.output["paternal_occupancy"]) as pat_out:
+        res_pat_filt_df.write_csv(pat_out, null_values=["NA"])

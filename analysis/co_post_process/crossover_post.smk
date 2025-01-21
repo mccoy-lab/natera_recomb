@@ -29,6 +29,13 @@ rule all:
             sex=["maternal", "paternal"],
             euploid=["euploid", "aneuploid"],
         ),
+        expand(
+            "results/{name}.crossover_filt.{recmap}.hotspot_occupy.{sex}.{euploid}.csv.gz",
+            name=config["crossover_data"].keys(),
+            recmap=config["recomb_maps"].keys(),
+            sex=["maternal", "paternal"],
+            euploid=["euploid"],
+        ),
 
 
 # ---------------- Analysis 1a. Conduct preprocessing analyses. -------- #
