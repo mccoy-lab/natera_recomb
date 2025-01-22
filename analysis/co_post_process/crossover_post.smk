@@ -180,6 +180,9 @@ rule estimate_centromere_telomere_dist:
         aneuploidy_tsv=config["aneuploidy_data"],
         genmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
         covariates=config["covariates"],
+        centromeres=config["centromeres"],
+        telomeres=config["telomeres"],
+        chromsize=config["chromsize"]
     output:
         maternal_co_dist="results/{name}.crossover_filt.{recmap}.centromere_telomere_dist.maternal.{euploid}.csv.gz",
         paternal_co_dist="results/{name}.crossover_filt.{recmap}.centromere_telomere_dist.paternal.{euploid}.csv.gz",

@@ -4,13 +4,14 @@ Code implementing uncertainty quantification in hotspot-occupancy per-individual
 Based on proposed model from Coop et al 2008.
 """
 
+import gzip as gz
+
 import numpy as np
 import pandas as pd
 import polars as pl
 from intervaltree import IntervalTree
 from scipy.stats import norm
 from tqdm import tqdm
-import gzip as gz
 
 
 def create_co_intervals(co_df):

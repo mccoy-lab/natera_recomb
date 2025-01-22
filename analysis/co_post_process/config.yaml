@@ -13,3 +13,6 @@ recomb_maps:
 hotspots:
     Male: "../../data/genmaps/halldorsson19/aau1043_datas1.gz"
     Female: "../../data/genmaps/halldorsson19/aau1043_datas2.gz"
+centromeres: "../../data/gaps/centromeres_grch38.bed"
+telomeres: "../../data/gaps/telomeres_grch38.bed"
+chromsize: "../../data/gaps/hg38.chrom.sizes"

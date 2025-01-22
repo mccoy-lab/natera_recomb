@@ -1,7 +1,8 @@
-import numpy as np
-from scipy.stats import *
-import polars as pl
 import gzip as gz
+
+import numpy as np
+import polars as pl
+from scipy.stats import *
 from tqdm import tqdm
 
 if __name__ == "__main__":
