@@ -382,7 +382,7 @@ rule regenie_step1:
         outfix=lambda wildcards: f"results/gwas_output/regenie/predictions/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}",
     shell:
         """
-        plink2 --pfile results/pgen_input/{wildcards.project_name} --threads {threads} --maf 0.005 --mac 5 --memory 9000 --indep-pairwise 200 25 0.4 --out {params.outfix}
+        plink2 --pfile results/pgen_input/{wildcards.project_name} --remove {input.sex_exclusion} --threads {threads} --maf 0.005 --mac 5 --memory 9000 --indep-pairwise 200 25 0.4 --out {params.outfix}
         regenie --step 1 --pgen results/pgen_input/{wildcards.project_name} --extract {output.include_snps} --covarFile {input.covar} --phenoFile {input.pheno} --remove {input.sex_exclusion} --bsize 200 --apply-rint --print-prs --threads {threads} --lowmem --lowmem-prefix tmp_rg --out {params.outfix}
         """
 
