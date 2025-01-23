@@ -599,6 +599,9 @@ rule combine_gwas_effect_size_afreq:
     resources:
         time="1:00:00",
         mem_mb="8G",
+    params:
+        pheno=lambda wildcards: f"{wildcards.pheno}",
+        sex=lambda wildcards: f"{wildcards.sex}",
     script:
         "scripts/combine_freq_clump_plink.py"
 
