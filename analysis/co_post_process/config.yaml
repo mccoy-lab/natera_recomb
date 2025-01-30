@@ -10,3 +10,9 @@ crossover_data:
 covariates: '../gwas/results/covariates/natera_recombination_gwas.covars.regenie.txt'
 recomb_maps:
   deCode_haldorsson19: "../../data/genmaps/halldorsson19/aau1043_datas3.gz"
+hotspots:
+    Male: "../../data/genmaps/halldorsson19/aau1043_datas1.gz"
+    Female: "../../data/genmaps/halldorsson19/aau1043_datas2.gz"
+centromeres: "../../data/gaps/centromeres_grch38.bed"
+telomeres: "../../data/gaps/telomeres_grch38.bed"
+chromsize: "../../data/gaps/hg38.chrom.sizes"

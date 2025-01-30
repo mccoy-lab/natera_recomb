@@ -23,11 +23,12 @@ rule all:
             recmap=config["recomb_maps"].keys(),
         ),
         expand(
-            "results/{name}.crossover_filt.{recmap}.crossover_count.{sex}.{euploid}.csv.gz",
+            "results/{name}.crossover_filt.{recmap}.{datatype}.{sex}.{euploid}.csv.gz",
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
             sex=["maternal", "paternal"],
             euploid=["euploid", "aneuploid"],
+            datatype=["crossover_count", "hotspot_occupy", "centromere_telomere_dist"],
         ),
 
 
@@ -171,3 +172,68 @@ rule estimate_crossover_counts:
         euploid=lambda wildcards: wildcards.euploid == "euploid",
     script:
         "scripts/gen_co_counts.py"
+
+
+rule estimate_centromere_telomere_dist:
+    input:
+        crossover_fp=rules.merge_euploid_aneuploid.output.merged_tsv,
+        aneuploidy_tsv=config["aneuploidy_data"],
+        genmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
+        covariates=config["covariates"],
+        centromeres=config["centromeres"],
+        telomeres=config["telomeres"],
+        chromsize=config["chromsize"]
+    output:
+        maternal_co_dist="results/{name}.crossover_filt.{recmap}.centromere_telomere_dist.maternal.{euploid}.csv.gz",
+        paternal_co_dist="results/{name}.crossover_filt.{recmap}.centromere_telomere_dist.paternal.{euploid}.csv.gz",
+    wildcard_constraints:
+        euploid="euploid|aneuploid",
+    params:
+        euploid=lambda wildcards: wildcards.euploid == "euploid",
+    script:
+        "scripts/gen_rec_location.py"
+
+
+rule create_sex_specific_hotspots:
+    """Create sex-specific hotspot files from Haldorsson et al 2019."""
+    input:
+        genmap=lambda wildcards: config["hotspots"][wildcards.sex],
+    output:
+        hotspots="results/hotspots/{name}.{sex}.hotspots.tsv",
+    wildcard_constraints:
+        sex="Male|Female",
+    params:
+        srr=10,
+    resources:
+        time="1:00:00",
+        mem_mb="8G",
+    run:
+        df = pd.read_csv(input.genmap, sep="\t", comment="#")
+        df["SRR"] = df.cMperMb / df.cMperMb.mean()
+        filt_df = df[df.SRR > params.srr]
+        filt_df.rename(
+            columns={"Chr": "chrom", "Begin": "start", "End": "end"}, inplace=True
+        )
+        filt_df.to_csv(output.hotspots, index=None, sep="\t")
+
+
+rule estimate_hotspot_occupancy:
+    input:
+        crossover_fp=rules.merge_euploid_aneuploid.output.merged_tsv,
+        male_hotspots="results/hotspots/{name}.Male.hotspots.tsv",
+        female_hotspots="results/hotspots/{name}.Female.hotspots.tsv",
+        aneuploidy_tsv=config["aneuploidy_data"],
+        genmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
+        covariates=config["covariates"],
+    output:
+        maternal_occupancy="results/{name}.crossover_filt.{recmap}.hotspot_occupy.maternal.{euploid}.csv.gz",
+        paternal_occupancy="results/{name}.crossover_filt.{recmap}.hotspot_occupy.paternal.{euploid}.csv.gz",
+    wildcard_constraints:
+        euploid="euploid|aneuploid",
+    params:
+        euploid=lambda wildcards: wildcards.euploid == "euploid",
+        max_interval=50e3,
+        nreps=100,
+        ngridpts=300,
+    script:
+        "scripts/gen_hotspot_occupancy.py"

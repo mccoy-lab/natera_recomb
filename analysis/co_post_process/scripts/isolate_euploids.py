@@ -1,6 +1,7 @@
+import gzip
+
 import numpy as np
 import polars as pl
-import gzip
 
 
 def obtain_euploid_aneuploid(aneuploidy_fp, ppThresh=0.90, threads=8):

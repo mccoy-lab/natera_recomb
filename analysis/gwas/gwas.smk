@@ -50,12 +50,12 @@ rule all:
             project_name=config["project_name"],
         ),
         # expand(
-            # "results/h2/h2sq_ldms/h2_est_total/{project_name}.total.hsq",
-            # project_name=config["project_name"],
+        # "results/h2/h2sq_ldms/h2_est_total/{project_name}.total.hsq",
+        # project_name=config["project_name"],
         # ),
         # expand(
-            # "results/h2/h2sq_chrom/h2_est_total/{project_name}.total.hsq",
-            # project_name=config["project_name"],
+        # "results/h2/h2sq_chrom/h2_est_total/{project_name}.total.hsq",
+        # project_name=config["project_name"],
         # ),
 
 
@@ -80,7 +80,7 @@ rule vcf2pgen:
     shell:
         """
         plink2 --vcf {input.vcf_file} --double-id \
-        --max-alleles 2 --maf 0.005 --memory 9000\
+        --max-alleles 2 --maf 0.005 --mac 1 --memory 9000\
         --threads {threads} --make-pgen --lax-chrx-import --out {params.outfix} 
         """
 
@@ -382,7 +382,7 @@ rule regenie_step1:
         outfix=lambda wildcards: f"results/gwas_output/regenie/predictions/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}",
     shell:
         """
-        plink2 --pfile results/pgen_input/{wildcards.project_name} --threads {threads} --maf 0.005 --memory 9000 --indep-pairwise 200 25 0.4 --out {params.outfix}
+        plink2 --pfile results/pgen_input/{wildcards.project_name} --threads {threads} --autosome --maf 0.005 --mac 5 --memory 9000 --indep-pairwise 200 25 0.4 --out {params.outfix}
         regenie --step 1 --pgen results/pgen_input/{wildcards.project_name} --extract {output.include_snps} --covarFile {input.covar} --phenoFile {input.pheno} --remove {input.sex_exclusion} --bsize 200 --apply-rint --print-prs --threads {threads} --lowmem --lowmem-prefix tmp_rg --out {params.outfix}
         """
 
@@ -599,6 +599,9 @@ rule combine_gwas_effect_size_afreq:
     resources:
         time="1:00:00",
         mem_mb="8G",
+    params:
+        pheno=lambda wildcards: f"{wildcards.pheno}",
+        sex=lambda wildcards: f"{wildcards.sex}",
     script:
         "scripts/combine_freq_clump_plink.py"
 
