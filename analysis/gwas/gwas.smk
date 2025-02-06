@@ -664,6 +664,23 @@ rule add_rsids:
         """
 
 
+#-------- 4b. Fine-mapping GWAS loci using SuSiE ----------- # 
+rule susie_gwas_loci:
+    input:
+        pgen=rules.merge_full_pgen.output.pgen,
+        psam=rules.merge_full_pgen.output.psam,
+        pvar=rules.merge_full_pgen.output.pvar
+        raw_sumstats = rules.
+        sumstats = rules.add_rsids.output.sumstats_rsids
+    output:
+        finemapped_sum_stats="results/gwas_output/{{format}}/finemapped/{{project_name}}_{sex}_{{format}}.{pheno}.sumstats.finemapped.susie.tsv",
+    conda: 'envs/susie.yaml'
+    script:
+        "scripts/susie_finemap.R"
+
+
+
+
 # -------- 5. Estimating per-chromosome h2 using GREML -------- #
 rule estimate_per_chrom_sex_grm:
     input:
