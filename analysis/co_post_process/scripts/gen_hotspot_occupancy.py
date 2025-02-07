@@ -266,14 +266,34 @@ if __name__ == "__main__":
     res_pat_df = pl.from_pandas(res_pat_df)
     res_mat_filt_df = (
         res_mat_df.join(
-            co_df[["uid", "mother", "father", "child", "euploid"]].unique(), on=["uid"]
+            co_df[
+                [
+                    "uid",
+                    "mother",
+                    "father",
+                    "child",
+                    "euploid",
+                    "maternal_meiotic_aneuploidy",
+                ]
+            ].unique(),
+            on=["uid"],
         )
         .with_columns(pl.col("mother").alias("IID"))
         .join(covar_df, on=["IID"])
     )
     res_pat_filt_df = (
         res_pat_df.join(
-            co_df[["uid", "mother", "father", "child", "euploid"]].unique(), on=["uid"]
+            co_df[
+                [
+                    "uid",
+                    "mother",
+                    "father",
+                    "child",
+                    "euploid",
+                    "maternal_meiotic_aneuploidy",
+                ]
+            ].unique(),
+            on=["uid"],
         )
         .with_columns(pl.col("father").alias("IID"))
         .join(covar_df, on=["IID"])
