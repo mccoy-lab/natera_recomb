@@ -142,6 +142,7 @@ if __name__ == "__main__":
                 pl.col("patient_age").mean(),
                 pl.col("egg_donor").first(),
                 pl.col("sperm_donor").first(),
+                pl.col("maternal_meiotic_aneuploidy").first(),
             )
         )
     else:
@@ -158,6 +159,7 @@ if __name__ == "__main__":
                 pl.col("patient_age").mean(),
                 pl.col("egg_donor").first(),
                 pl.col("sperm_donor").first(),
+                pl.col("maternal_meiotic_aneuploidy").first(),
             )
         )
     # Get the avg_pi0 and avg_sigma from the aneuploidy calls explicitly
@@ -185,6 +187,7 @@ if __name__ == "__main__":
                 pl.col("partner_age").mean(),
                 pl.col("egg_donor").first(),
                 pl.col("sperm_donor").first(),
+                pl.col("maternal_meiotic_aneuploidy").first(),
             )
         )
     else:
@@ -201,6 +204,7 @@ if __name__ == "__main__":
                 pl.col("partner_age").mean(),
                 pl.col("egg_donor").first(),
                 pl.col("sperm_donor").first(),
+                pl.col("maternal_meiotic_aneuploidy").first(),
             )
         )
     # Get the avg_pi0 and avg_sigma from the aneuploidy calls explicitly
