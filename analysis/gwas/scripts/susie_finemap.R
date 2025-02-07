@@ -4,8 +4,22 @@ library(dplyr)
 library(glue)
 
 
-create_loci <- function(sumstats_df, window_size = 1e6) {
-  # Create loci for independent loci
+create_loci <- function(locus_sumstats_df, trait, window_size = 500000, pval = 1e-8) {
+  # Filter to just the locus focused on this trait
+  sumstats_filt_df <- locus_sumstats_df %>% filter(PHENO == trait)
+  sumstats_filt_df <- sumstats_filt_df %>%
+    rowwise() %>%
+    mutate(CHROM = strsplit(ID, ":")[[1]][1], POS = strsplit(ID, ":")[[1]][2]) %>%
+    arrange(P)
+  regions <- c()
+  while (nrow(sumstats_filt_df) > 0) {
+    chrom <- sumstats_filt_df$CHROM[1]
+    pos <- sumstats_filt_df$POS[1]
+    gene <- sumstats_filt_df$Gene[1]
+    regions <- c(regions, glue("{chrom}:{pos-window_size}-{pos+window_size}:{gene}"))
+    sumstats_filt_df <- sumstats_filt_df %>% filter(~ ((CHROM == chrom) & (POS > pos - window_size) & (POS < pos + window_size)))
+  }
+  return(regions)
 }
 
 
@@ -63,25 +77,32 @@ run_susie <- function(res) {
 }
 
 
-# Read in the summary stats for the trait of interest
-sumstats_df <- fread(snakemake@input[["sumstats_raw"]])
+# Read in the summary stat of interest & annotate with the trait of interest
+sumstats_df <- fread(snakemake@input[["raw_sumstats"]])
+loci_df <- fread(snakemake@input[["locus_sumstats"]])
+trait <- glue("{snakemake@wildcards[['pheno']]}_{snakemake@wildcards[['sex']]}")
 sumstats_df <- sumstats_df %>% mutate(CHROM = paste("chr", "#CHROM", sep = ""))
 
+
+# Running Susie on each locus
 locus_finemapped_sumstats <- list()
-loci <- create_loci(sumstats_df)
+loci <- create_loci(loci_df, trait = trait)
 i <- 1
 for (region in loci) {
   region_str <- strsplit(region, ":|-")[[1]]
   chrom <- region_str[1]
   start <- region_str[2]
   end <- region_str[3]
+  gene <- region_str[4]
   subset_res <- subset_sumstats_ld_matrix(sumstats_df, chrom = chrom, start = start, end = end)
   susie_res_df <- run_susie(subset_res)
   susie_res_df$region <- region_str
+  susie_res_df$Gene <- gene
   locus_finemapped_sumstats[[i]] <- susie_res_df
   i <- i + 1
 }
 
 # Collapse the different genome-wide significant-loci
 full_finemapped_df <- bind_rows(locus_finemapped_sumstats)
+full_finemapped_df$PHENO <- trait
 write.table(full_finemapped_df, snakemake@output[["finemapped_sumstats"]], append = FALSE, sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)

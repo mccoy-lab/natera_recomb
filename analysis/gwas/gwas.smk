@@ -664,21 +664,33 @@ rule add_rsids:
         """
 
 
-#-------- 4b. Fine-mapping GWAS loci using SuSiE ----------- # 
+# -------- 4b. Fine-mapping GWAS loci using SuSiE ----------- #
 rule susie_gwas_loci:
     input:
         pgen=rules.merge_full_pgen.output.pgen,
         psam=rules.merge_full_pgen.output.psam,
-        pvar=rules.merge_full_pgen.output.pvar
-        raw_sumstats = rules.
-        sumstats = rules.add_rsids.output.sumstats_rsids
+        pvar=rules.merge_full_pgen.output.pvar,
+        raw_sumstats="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
+        locus_sumstats=rules.add_rsids.output.sumstats_rsids,
     output:
-        finemapped_sum_stats="results/gwas_output/{{format}}/finemapped/{{project_name}}_{sex}_{{format}}.{pheno}.sumstats.finemapped.susie.tsv",
-    conda: 'envs/susie.yaml'
+        finemapped_sum_stats="results/gwas_output/{format}/finemapped/{project_name}_{sex}_{format}.{pheno}.sumstats.finemapped.susie.tsv",
+    conda:
+        "envs/susie.yaml"
+    threads: 12
     script:
         "scripts/susie_finemap.R"
 
 
+rule collect_finemapping:
+    """Test routine to collect finemapping results."""
+    input:
+        expand(
+            "results/gwas_output/{format}/finemapped/{project_name}_{sex}_{format}.{pheno}.sumstats.finemapped.susie.tsv",
+            project_name=config["project_name"],
+            sex=["Male", "Female"],
+            pheno=["HotspotOccupancy"],
+            format=["regenie"],
+        ),
 
 
 # -------- 5. Estimating per-chromosome h2 using GREML -------- #
