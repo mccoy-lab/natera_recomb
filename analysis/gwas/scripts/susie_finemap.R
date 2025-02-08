@@ -94,8 +94,9 @@ for (region in loci) {
   start <- as.integer(region_str[2])
   end <- as.integer(region_str[3])
   gene <- region_str[4]
+  regionfix <- gsub(":|-", "_", region)
   print(region_str)
-  outfix = glue('/tmp/tmp_{region_str}')
+  outfix = glue('/tmp/tmp_{regionfix}')
   subset_res <- subset_sumstats_ld_matrix(sumstats_df, chrom = chrom, start = start, end = end, outfix=outfix, threads=snakemake@threads[[1]])
   susie_res_df <- run_susie(subset_res)
   susie_res_df$region <- region_str
