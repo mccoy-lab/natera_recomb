@@ -8,5 +8,6 @@ dependencies:
   - r-susier
   - r-rfast
   - r-glue
+  - r-dplyr
   - plink
   - plink2

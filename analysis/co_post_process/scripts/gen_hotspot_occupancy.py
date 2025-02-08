@@ -236,6 +236,7 @@ if __name__ == "__main__":
     )
     # Merge in data on covariates here using polars
     co_df = pl.from_pandas(co_df)
+    print(co_df.columns)
     aneuploidy_df = pl.read_csv(
         snakemake.input["aneuploidy_tsv"], separator="\t", null_values=["NA"]
     )

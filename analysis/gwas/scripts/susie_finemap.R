@@ -1,35 +1,35 @@
 library(susieR)
-library(fread)
+library(data.table)
 library(dplyr)
 library(glue)
-
+library(tibble)
 
 create_loci <- function(locus_sumstats_df, trait, window_size = 500000, pval = 1e-8) {
   # Filter to just the locus focused on this trait
-  sumstats_filt_df <- locus_sumstats_df %>% filter(PHENO == trait)
+  sumstats_filt_df <- locus_sumstats_df %>% filter(PHENO == trait, P < pval)
   sumstats_filt_df <- sumstats_filt_df %>%
     rowwise() %>%
-    mutate(CHROM = strsplit(ID, ":")[[1]][1], POS = strsplit(ID, ":")[[1]][2]) %>%
+    mutate(CHROM = strsplit(ID, ":")[[1]][1], POS = as.numeric(strsplit(ID, ":")[[1]][2])) %>%
     arrange(P)
   regions <- c()
   while (nrow(sumstats_filt_df) > 0) {
     chrom <- sumstats_filt_df$CHROM[1]
-    pos <- sumstats_filt_df$POS[1]
+    pos <- as.integer(sumstats_filt_df$POS[1])
     gene <- sumstats_filt_df$Gene[1]
     regions <- c(regions, glue("{chrom}:{pos-window_size}-{pos+window_size}:{gene}"))
-    sumstats_filt_df <- sumstats_filt_df %>% filter(~ ((CHROM == chrom) & (POS > pos - window_size) & (POS < pos + window_size)))
+    sumstats_filt_df <- sumstats_filt_df %>% filter(CHROM != chrom, !between(POS, (pos - window_size), (pos + window_size))) %>% arrange(P)
   }
   return(regions)
 }
 
 
-subset_sumstats_ld_matrix <- function(sumstats_df, chrom = "chr5", start = NA, end = NA, outfix = "/tmp/test1") {
-  subset_plink <- glue("plink2 --pgen {snakemake@input[['pgen']]} --pvar {snakemake@input['pvar']} --psam {snakemake@input['psam']} --remove {snakemake. --chr {chrom} --from-bp {start} --to-bp {end} --make-bed --out {outfix} --threads 12")
+subset_sumstats_ld_matrix <- function(sumstats_df, chrom = "chr5", start = NA, end = NA, threads=12, outfix = "/tmp/test1") {
+  subset_plink <- glue("plink2 --pgen {snakemake@input[['pgen']]} --pvar {snakemake@input['pvar']} --psam {snakemake@input['psam']} --remove {snakemake@input[['sex_exclude']]} --chr {chrom} --from-bp {start} --to-bp {end} --make-bed --out {outfix} --threads {threads}")
   system(subset_plink)
-  ldmatrix <- glue("plink --bfile {outfix} --keep-allele-order  --r square --out {outfix}")
+  ldmatrix <- glue("plink --bfile {outfix} --keep-allele-order  --r square --threads {threads} --out {outfix}")
   system(ldmatrix)
   R_hat <- as.matrix(fread(glue("{outfix}.ld")))
-  sumstats_filt_df <- sumstats_df %>% filter((POS >= start) & (POS <= end) & (CHROM == chrom))
+  sumstats_filt_df <- sumstats_df %>% filter(CHROM == chrom, POS > start, POS < end)
   n <- sumstats_filt_df$OBS_CT[1]
   if (nrow(sumstats_filt_df) != dim(R_hat)[1]) {
     stop("Sumstats and LD-matrix are mis-aligned!")
@@ -37,7 +37,7 @@ subset_sumstats_ld_matrix <- function(sumstats_df, chrom = "chr5", start = NA, e
   betas <- sumstats_filt_df$BETA
   ses <- sumstats_filt_df$SE
   system(glue("rm {outfix}*"))
-  return(list(beta = betas, se = ses, n = n, R = R_hat, sumstats = sumstats_filt_df))
+  return(list(betas = betas, ses = ses, n = n, R = R_hat, sumstats = sumstats_filt_df))
 }
 
 run_susie <- function(res) {
@@ -51,7 +51,7 @@ run_susie <- function(res) {
   # NOTE: now annotate the downstream summary stats with credible set annotations & PIP annotation
   sumstats_filt_cs_df <- res$sumstats
   sumstats_filt_cs_df$PIP <- susie_res$pip
-  snp_ids <- sumstats_filt_df$ID
+  snp_ids <- sumstats_filt_cs_df$ID
   results <- data.frame(variant_id = character(), pip = numeric(), credible_set = character())
   for (variant_idx in 1:length(snp_ids)) {
     results[nrow(results) + 1, ] <- c(snp_ids[variant_idx], res_prdm9$pip[variant_idx], NA)
@@ -78,23 +78,25 @@ run_susie <- function(res) {
 
 
 # Read in the summary stat of interest & annotate with the trait of interest
-sumstats_df <- fread(snakemake@input[["raw_sumstats"]])
-loci_df <- fread(snakemake@input[["locus_sumstats"]])
+sumstats_df <- fread(snakemake@input[["raw_sumstats"]], nThread=snakemake@threads[[1]])
+loci_df <- fread(snakemake@input[["locus_sumstats"]], nThread=snakemake@threads[[1]])
 trait <- glue("{snakemake@wildcards[['pheno']]}_{snakemake@wildcards[['sex']]}")
-sumstats_df <- sumstats_df %>% mutate(CHROM = paste("chr", "#CHROM", sep = ""))
-
+sumstats_df <- sumstats_df %>% rowwise() %>%  mutate(CHROM = strsplit(ID, ":")[[1]][1])
 
 # Running Susie on each locus
 locus_finemapped_sumstats <- list()
 loci <- create_loci(loci_df, trait = trait)
+print(loci)
 i <- 1
 for (region in loci) {
   region_str <- strsplit(region, ":|-")[[1]]
   chrom <- region_str[1]
-  start <- region_str[2]
-  end <- region_str[3]
+  start <- as.integer(region_str[2])
+  end <- as.integer(region_str[3])
   gene <- region_str[4]
-  subset_res <- subset_sumstats_ld_matrix(sumstats_df, chrom = chrom, start = start, end = end)
+  print(region_str)
+  outfix = glue('/tmp/tmp_{region_str}')
+  subset_res <- subset_sumstats_ld_matrix(sumstats_df, chrom = chrom, start = start, end = end, outfix=outfix, threads=snakemake@threads[[1]])
   susie_res_df <- run_susie(subset_res)
   susie_res_df$region <- region_str
   susie_res_df$Gene <- gene

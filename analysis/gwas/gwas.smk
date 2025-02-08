@@ -671,6 +671,7 @@ rule susie_gwas_loci:
         psam=rules.merge_full_pgen.output.psam,
         pvar=rules.merge_full_pgen.output.pvar,
         raw_sumstats="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
+        sex_exclude="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
         locus_sumstats=rules.add_rsids.output.sumstats_rsids,
     output:
         finemapped_sum_stats="results/gwas_output/{format}/finemapped/{project_name}_{sex}_{format}.{pheno}.sumstats.finemapped.susie.tsv",
