@@ -54,7 +54,7 @@ run_susie <- function(res) {
   snp_ids <- sumstats_filt_cs_df$ID
   results <- data.frame(variant_id = character(), pip = numeric(), credible_set = character())
   for (variant_idx in 1:length(snp_ids)) {
-    results[nrow(results) + 1, ] <- c(snp_ids[variant_idx], res_prdm9$pip[variant_idx], NA)
+    results[nrow(results) + 1, ] <- c(snp_ids[variant_idx], susie_res$pip[variant_idx], NA)
   }
   cs_results <- data.frame(credible_set = character(), cs_nvars = integer(), cs_coverage = numeric(), cs_min_corr = numeric(), cs_mean_corr = numeric(), cs_median_corr = numeric())
 
