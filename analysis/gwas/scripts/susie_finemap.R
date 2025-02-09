@@ -52,7 +52,7 @@ run_susie <- function(res) {
   sumstats_filt_cs_df <- res$sumstats
   sumstats_filt_cs_df$PIP <- susie_res$pip
   snp_ids <- sumstats_filt_cs_df$ID
-  results <- data.frame(variant_id = character(), pip = numeric(), credible_set = character())
+  results <- data.frame(ID = character(), pip = numeric(), credible_set = character())
   for (variant_idx in 1:length(snp_ids)) {
     results[nrow(results) + 1, ] <- c(snp_ids[variant_idx], susie_res$pip[variant_idx], NA)
   }
@@ -99,7 +99,7 @@ for (region in loci) {
   outfix = glue('/tmp/tmp_{regionfix}')
   subset_res <- subset_sumstats_ld_matrix(sumstats_df, chrom = chrom, start = start, end = end, outfix=outfix, threads=snakemake@threads[[1]])
   susie_res_df <- run_susie(subset_res)
-  susie_res_df$region <- region_str
+  susie_res_df$region <- region
   susie_res_df$Gene <- gene
   locus_finemapped_sumstats[[i]] <- susie_res_df
   i <- i + 1

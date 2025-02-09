@@ -674,7 +674,7 @@ rule susie_gwas_loci:
         sex_exclude="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
         locus_sumstats=rules.add_rsids.output.sumstats_rsids,
     output:
-        finemapped_sum_stats="results/gwas_output/{format}/finemapped/{project_name}_{sex}_{format}.{pheno}.sumstats.finemapped.susie.tsv",
+        finemapped_sumstats="results/gwas_output/{format}/finemapped/{project_name}_{sex}_{format}.{pheno}.sumstats.finemapped.susie.tsv",
     conda:
         "envs/susie.yaml"
     threads: 12
