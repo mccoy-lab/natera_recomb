@@ -688,8 +688,14 @@ rule collect_finemapping:
         expand(
             "results/gwas_output/{format}/finemapped/{project_name}_{sex}_{format}.{pheno}.sumstats.finemapped.susie.tsv",
             project_name=config["project_name"],
-            sex=["Male", "Female"],
-            pheno=["HotspotOccupancy"],
+            sex=["Male", "Female", "Joint"],
+            pheno=[
+                "MeanCO",
+                "CentromereDist",
+                "HotspotOccupancy",
+                "GcContent",
+                "ReplicationTiming",
+            ],
             format=["regenie"],
         ),
 

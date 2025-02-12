@@ -7,10 +7,12 @@ library(tibble)
 create_loci <- function(locus_sumstats_df, trait, window_size = 500000, pval = 1e-8) {
   # Filter to just the locus focused on this trait
   sumstats_filt_df <- locus_sumstats_df %>% filter(PHENO == trait, P < pval)
-  sumstats_filt_df <- sumstats_filt_df %>%
-    rowwise() %>%
-    mutate(CHROM = strsplit(ID, ":")[[1]][1], POS = as.numeric(strsplit(ID, ":")[[1]][2])) %>%
-    arrange(P)
+  if (nrow(sumstats_filt_df) > 0){
+    sumstats_filt_df <- sumstats_filt_df %>%
+      rowwise() %>%
+      mutate(CHROM = strsplit(ID, ":")[[1]][1], POS = as.numeric(strsplit(ID, ":")[[1]][2])) %>%
+      arrange(P)
+  }
   regions <- c()
   while (nrow(sumstats_filt_df) > 0) {
     chrom <- sumstats_filt_df$CHROM[1]
