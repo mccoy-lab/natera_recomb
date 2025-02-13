@@ -685,8 +685,8 @@ rule susie_gwas_loci:
 rule collect_finemapping:
     """Test routine to collect finemapping results."""
     input:
-        expand(
-            "results/gwas_output/{format}/finemapped/{project_name}_{sex}_{format}.{pheno}.sumstats.finemapped.susie.tsv",
+        tsvs=expand(
+            "results/gwas_output/{{format}}/finemapped/{project_name}_{sex}_{{format}}.{pheno}.sumstats.finemapped.susie.tsv",
             project_name=config["project_name"],
             sex=["Male", "Female", "Joint"],
             pheno=[
@@ -696,7 +696,26 @@ rule collect_finemapping:
                 "GcContent",
                 "ReplicationTiming",
             ],
+        ),
+    output:
+        tsv="results/gwas_output/{format}/finemapped/{project_name}_{format}_total.sumstats.finemapped.susie.tsv",
+    run:
+        import polars as pl
+
+        tot_df = pl.concat(
+            [pl.scan_csv(f, separator="\t", null_values=["NA"]) for f in input.tsvs],
+            how="diagonal",
+        ).collect(streaming=True)
+        tot_df.write_csv(output.tsv, separator="\t", null_value="NA")
+
+
+rule total_finemapping:
+    """Finalization of finemapping results."""
+    input:
+        expand(
+            "results/gwas_output/{format}/finemapped/{project_name}_{format}_total.sumstats.finemapped.susie.tsv",
             format=["regenie"],
+            project_name=config["project_name"],
         ),
 
 
