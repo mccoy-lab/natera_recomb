@@ -714,7 +714,7 @@ rule total_finemapping:
     input:
         expand(
             "results/gwas_output/{format}/finemapped/{project_name}_{format}_total.sumstats.finemapped.susie.tsv",
-            format=["regenie"],
+            format=["regenie", "plink2"],
             project_name=config["project_name"],
         ),
 
