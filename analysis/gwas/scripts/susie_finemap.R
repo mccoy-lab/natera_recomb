@@ -16,10 +16,12 @@ create_loci <- function(locus_sumstats_df, trait, window_size = 500000, pval = 1
   regions <- c()
   while (nrow(sumstats_filt_df) > 0) {
     chrom <- sumstats_filt_df$CHROM[1]
-    pos <- as.integer(sumstats_filt_df$POS[1])
-    gene <- sumstats_filt_df$Gene[1]
-    regions <- c(regions, glue("{chrom}:{pos-window_size}-{pos+window_size}:{gene}"))
-    sumstats_filt_df <- sumstats_filt_df %>% filter(CHROM != chrom, !between(POS, (pos - window_size), (pos + window_size))) %>% arrange(P)
+    if (chrom != "chrX"){
+      pos <- as.integer(sumstats_filt_df$POS[1])
+      gene <- sumstats_filt_df$Gene[1]
+      regions <- c(regions, glue("{chrom}:{pos-window_size}-{pos+window_size}:{gene}"))
+      sumstats_filt_df <- sumstats_filt_df %>% filter(CHROM != chrom, !between(POS, (pos - window_size), (pos + window_size))) %>% arrange(P)
+    }
   }
   return(regions)
 }
