@@ -703,7 +703,7 @@ rule collect_finemapping:
         import polars as pl
 
         tot_df = pl.concat(
-            [pl.scan_csv(f, separator="\t", null_values=["NA"]) for f in input.tsvs],
+            [pl.scan_csv(f, separator="\t", null_values=["NA"], ignore_errors=True) for f in input.tsvs],
             how="diagonal",
         ).collect(streaming=True)
         tot_df.write_csv(output.tsv, separator="\t", null_value="NA")
