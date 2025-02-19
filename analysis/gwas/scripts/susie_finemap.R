@@ -21,6 +21,8 @@ create_loci <- function(locus_sumstats_df, trait, window_size = 500000, pval = 1
       gene <- sumstats_filt_df$Gene[1]
       regions <- c(regions, glue("{chrom}:{pos-window_size}-{pos+window_size}:{gene}"))
       sumstats_filt_df <- sumstats_filt_df %>% filter(CHROM != chrom, !between(POS, (pos - window_size), (pos + window_size))) %>% arrange(P)
+    } else {
+       sumstats_filt_df <- sumstats_filt_df %>% filter(CHROM != chrom)
     }
   }
   return(regions)
