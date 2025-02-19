@@ -4,7 +4,7 @@ library(dplyr)
 library(glue)
 library(tibble)
 
-create_loci <- function(locus_sumstats_df, trait, window_size = 500000, pval = 1e-8) {
+create_loci <- function(locus_sumstats_df, trait, window_size = 500000, pval = 5e-8) {
   # Filter to just the locus focused on this trait
   sumstats_filt_df <- locus_sumstats_df %>% filter(PHENO == trait, P < pval)
   if (nrow(sumstats_filt_df) > 0){
