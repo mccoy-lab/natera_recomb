@@ -664,6 +664,61 @@ rule add_rsids:
         """
 
 
+# -------- 4b. Fine-mapping GWAS loci using SuSiE ----------- #
+rule susie_gwas_loci:
+    input:
+        pgen=rules.merge_full_pgen.output.pgen,
+        psam=rules.merge_full_pgen.output.psam,
+        pvar=rules.merge_full_pgen.output.pvar,
+        raw_sumstats="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
+        sex_exclude="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
+        locus_sumstats=rules.add_rsids.output.sumstats_rsids,
+    output:
+        finemapped_sumstats="results/gwas_output/{format}/finemapped/{project_name}_{sex}_{format}.{pheno}.sumstats.finemapped.susie.tsv",
+    conda:
+        "envs/susie.yaml"
+    threads: 12
+    script:
+        "scripts/susie_finemap.R"
+
+
+rule collect_finemapping:
+    """Test routine to collect finemapping results."""
+    input:
+        tsvs=expand(
+            "results/gwas_output/{{format}}/finemapped/{project_name}_{sex}_{{format}}.{pheno}.sumstats.finemapped.susie.tsv",
+            project_name=config["project_name"],
+            sex=["Male", "Female", "Joint"],
+            pheno=[
+                "MeanCO",
+                "CentromereDist",
+                "HotspotOccupancy",
+                "GcContent",
+                "ReplicationTiming",
+            ],
+        ),
+    output:
+        tsv="results/gwas_output/{format}/finemapped/{project_name}_{format}_total.sumstats.finemapped.susie.tsv",
+    run:
+        import polars as pl
+
+        tot_df = pl.concat(
+            [pl.scan_csv(f, separator="\t", null_values=["NA"], ignore_errors=True) for f in input.tsvs],
+            how="diagonal",
+        ).collect(streaming=True)
+        tot_df.write_csv(output.tsv, separator="\t", null_value="NA")
+
+
+rule total_finemapping:
+    """Finalization of finemapping results."""
+    input:
+        expand(
+            "results/gwas_output/{format}/finemapped/{project_name}_{format}_total.sumstats.finemapped.susie.tsv",
+            format=["regenie", "plink2"],
+            project_name=config["project_name"],
+        ),
+
+
 # -------- 5. Estimating per-chromosome h2 using GREML -------- #
 rule estimate_per_chrom_sex_grm:
     input:

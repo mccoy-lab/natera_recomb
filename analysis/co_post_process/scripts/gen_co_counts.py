@@ -56,6 +56,9 @@ if __name__ == "__main__":
                 pl.col("patient_age").mean(),
                 pl.col("egg_donor").first(),
                 pl.col("sperm_donor").first(),
+                pl.col("avg_pi0").first(),
+                pl.col("avg_sigma").first(),
+                pl.col("maternal_meiotic_aneuploidy").first(),
             )
         )
     else:
@@ -69,6 +72,9 @@ if __name__ == "__main__":
                 pl.col("patient_age").mean(),
                 pl.col("egg_donor").first(),
                 pl.col("sperm_donor").first(),
+                pl.col("avg_pi0").first(),
+                pl.col("avg_sigma").first(),
+                pl.col("maternal_meiotic_aneuploidy").first(),
             )
         )
 
@@ -100,6 +106,7 @@ if __name__ == "__main__":
             pl.col("patient_age").forward_fill(),
             pl.col("egg_donor").forward_fill(),
             pl.col("sperm_donor").forward_fill(),
+            pl.col("maternal_meiotic_aneuploidy").forward_fill(),
         )
         .rename({"avg_pos": "nco", "mother": "IID"})
     )
@@ -121,6 +128,7 @@ if __name__ == "__main__":
                 pl.col("sperm_donor").first(),
                 pl.col("avg_pi0").first(),
                 pl.col("avg_sigma").first(),
+                pl.col("maternal_meiotic_aneuploidy").first(),
             )
         )
     else:
@@ -136,6 +144,7 @@ if __name__ == "__main__":
                 pl.col("sperm_donor").first(),
                 pl.col("avg_pi0").first(),
                 pl.col("avg_sigma").first(),
+                pl.col("maternal_meiotic_aneuploidy").first(),
             )
         )
 
@@ -162,6 +171,9 @@ if __name__ == "__main__":
             pl.col("partner_age").forward_fill(),
             pl.col("egg_donor").forward_fill(),
             pl.col("sperm_donor").forward_fill(),
+            pl.col("avg_pi0").forward_fill(),
+            pl.col("avg_sigma").forward_fill(),
+            pl.col("maternal_meiotic_aneuploidy").forward_fill(),
         )
         .rename({"avg_pos": "nco", "father": "IID"})
     )
