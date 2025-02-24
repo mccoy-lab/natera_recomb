@@ -10,16 +10,15 @@ from scipy.interpolate import interp1d
 from tqdm import tqdm
 
 
-# NOTE: need to be divided by the total length of the chromosome ...
-def centromere_dist(chrom, pos, centromere_dict):
+def centromere_dist(chrom, pos, centromere_dict, size_dict):
     pts = np.array([centromere_dict["start"][chrom], centromere_dict["end"][chrom]])
-    dist = np.min(np.abs(pos - pts))
+    dist = np.min(np.abs(pos - pts)) / size_dict[chrom]
     return dist
 
 
-def telomere_dist(chrom, pos, telomere_dict):
+def telomere_dist(chrom, pos, telomere_dict, size_dict):
     pts = np.array([telomere_dict["start"][chrom], telomere_dict["end"][chrom]])
-    dist = np.min(np.abs(pos - pts))
+    dist = np.min(np.abs(pos - pts)) / size_dict[chrom]
     return dist
 
 
@@ -38,7 +37,7 @@ def rt_dict(rt_df):
     return rt_func_dict
 
 
-def avg_dist_centromere(df, centromere_df, frac_siblings=0.5):
+def avg_dist_centromere(df, centromere_df, chromsize_df, frac_siblings=0.5):
     """Compute the average distance in bp from centromere of the nearest crossover."""
     assert "mother" in df.columns
     assert "father" in df.columns
@@ -53,10 +52,11 @@ def avg_dist_centromere(df, centromere_df, frac_siblings=0.5):
     centromere_dict = (
         centromere_df.groupby("chrom").agg({"start": "min", "end": "max"}).to_dict()
     )
+    chromsize_dict = chromsize_df.set_index(0).to_dict()[1]
     centromere_dists = np.zeros(df.shape[0])
     for i, (chrom, pos) in tqdm(enumerate(zip(df.chrom.values, df.avg_pos.values))):
         centromere_dists[i] = centromere_dist(
-            chrom, pos, centromere_dict=centromere_dict
+            chrom, pos, centromere_dict=centromere_dict, size_dict=chromsize_dict
         )
     df["centromere_dist"] = centromere_dists
     filt_df = (
@@ -80,7 +80,7 @@ def avg_dist_centromere(df, centromere_df, frac_siblings=0.5):
     return tot_df
 
 
-def avg_dist_telomere(df, telomere_df, frac_siblings=0.5):
+def avg_dist_telomere(df, telomere_df, chromsize_df, frac_siblings=0.5):
     """Compute the average distance in bp from the telomeres of the nearest crossover."""
     assert "mother" in df.columns
     assert "father" in df.columns
@@ -95,9 +95,12 @@ def avg_dist_telomere(df, telomere_df, frac_siblings=0.5):
     telomere_dict = (
         telomere_df.groupby("chrom").agg({"start": "min", "end": "max"}).to_dict()
     )
+    chromsize_dict = chromsize_df.set_index(0).to_dict()[1]
     telomere_dists = np.zeros(df.shape[0])
     for i, (chrom, pos) in tqdm(enumerate(zip(df.chrom.values, df.avg_pos.values))):
-        telomere_dists[i] = telomere_dist(chrom, pos, telomere_dict=telomere_dict)
+        telomere_dists[i] = telomere_dist(
+            chrom, pos, telomere_dict=telomere_dict, size_dict=chromsize_dict
+        )
     df["telomere_dist"] = telomere_dists
     filt_df = (
         df[df["frac_siblings"] > frac_siblings]
@@ -199,6 +202,7 @@ if __name__ == "__main__":
     rt_df = pd.read_csv(snakemake.input["replication_timing"], header=None, sep="\t")
     rt_df.columns = ["chrom", "start", "end", "rt"]
     rt_df["midpt"] = (rt_df["start"] + rt_df["end"]) / 2
+    chromsize_df = pd.read_csv(snakemake.input["chromsize"], sep="\t", header=None)
     centromere_pheno_df = avg_dist_centromere(co_df, centromere_df)
     telomere_pheno_df = avg_dist_telomere(co_df, telomere_df)
     rt_pheno_df = avg_replication_timing(co_df, rt_df)

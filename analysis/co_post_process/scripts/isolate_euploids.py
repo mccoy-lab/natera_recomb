@@ -119,21 +119,21 @@ def obtain_mat_meio(
             separator="+",
         ).alias("uid"),
     )
-    # Filter out the Day 3 embryos and ones that have nan
-    aneuploidy_df = aneuploidy_df.filter(
-        ~pl.col("day3_embryo") | (pl.col("1m").is_nan())
-    )
+    # Filter out the Day 3 embryos and ones that have nan for no BAF data
+    day3_null_embryos = aneuploidy_df.filter(
+        pl.col("day3_embryo") | pl.col("1m").is_nan() | pl.col('embryo_noise_3sd')
+    )['uid'].unique().to_numpy()
+    # Determine amplification errors as having >= 5 nullisomies? 
     amplification_failures = (
-        aneuploidy_df.group_by("uid")
+        aneuploidy_df.filter(~pl.col("uid").is_in(day3_null_embryos)).group_by("uid")
         .agg((pl.col("bf_max_cat") == "0").sum().alias("n_nullisomies"))
         .filter(pl.col("n_nullisomies") >= 5)["uid"]
         .to_numpy()
     )
-    aneuploidy_df = aneuploidy_df.filter(~pl.col("uid").is_in(amplification_failures))
+    aneuploidy_df = aneuploidy_df.filter(~pl.col('uid').is_in(day3_null_embryos)).filter(~pl.col("uid").is_in(amplification_failures))
     maternal_meiotic_uids = (
         aneuploidy_df.filter(
-            ~pl.col("embryo_noise_3sd")
-            & (pl.col("post_max") > ppThresh)
+            (pl.col("post_max") > ppThresh)
             & (pl.col("bf_max_cat").is_in(["3m", "1p"]))
         )
         .filter(

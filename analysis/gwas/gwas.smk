@@ -249,6 +249,7 @@ rule create_rec_location_phenotypes:
         telomeres=config["bed_files"]["telomeres"],
         replication_timing=config["bed_files"]["replication_timing"],
         gc_content=config["bed_files"]["gc_content"],
+        chromsize=config["bed_files"]["chromsize"],
     output:
         pheno="results/phenotypes/{project_name}.{format}.location.pheno",
     resources:
@@ -703,7 +704,10 @@ rule collect_finemapping:
         import polars as pl
 
         tot_df = pl.concat(
-            [pl.scan_csv(f, separator="\t", null_values=["NA"], ignore_errors=True) for f in input.tsvs],
+            [
+                pl.scan_csv(f, separator="\t", null_values=["NA"], ignore_errors=True)
+                for f in input.tsvs
+            ],
             how="diagonal",
         ).collect(streaming=True)
         tot_df.write_csv(output.tsv, separator="\t", null_value="NA")
