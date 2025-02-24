@@ -10,16 +10,24 @@ from scipy.interpolate import interp1d
 from tqdm import tqdm
 
 
-def centromere_dist(chrom, pos, centromere_dict, size_dict):
+def centromere_dist(chrom, pos, centromere_dict, size_dict=None):
     pts = np.array([centromere_dict["start"][chrom], centromere_dict["end"][chrom]])
-    dist = np.min(np.abs(pos - pts)) / size_dict[chrom]
-    return dist
+    if size_dict is not None:
+        dist = np.min(np.abs(pos - pts)) / size_dict[chrom]
+        return dist
+    else:
+        dist = np.min(np.abs(pos - pts))
+        return dist
 
 
-def telomere_dist(chrom, pos, telomere_dict, size_dict):
+def telomere_dist(chrom, pos, telomere_dict, size_dict=None):
     pts = np.array([telomere_dict["start"][chrom], telomere_dict["end"][chrom]])
-    dist = np.min(np.abs(pos - pts)) / size_dict[chrom]
-    return dist
+    if size_dict is not None:
+        dist = np.min(np.abs(pos - pts)) / size_dict[chrom]
+        return dist
+    else:
+        dist = np.min(np.abs(pos - pts))
+        return dist
 
 
 def rt_dict(rt_df):
@@ -35,6 +43,60 @@ def rt_dict(rt_df):
             bounds_error=False,
         )
     return rt_func_dict
+
+
+def prop_distal_crossover(
+    df, centromere_df, telomere_df, frac_siblings=0.5, window_size=5e6
+):
+    """Compute the proportion of crossovers within X Mbp of the centromere or telomere."""
+    assert "mother" in df.columns
+    assert "father" in df.columns
+    assert "child" in df.columns
+    assert "crossover_sex" in df.columns
+    assert "chrom" in df.columns
+    assert "avg_pos" in df.columns
+    assert "nsibs" in df.columns
+    assert "nsib_support" in df.columns
+    assert frac_siblings >= 0.5
+    assert window_size > 0
+    df["frac_siblings"] = df["nsib_support"] / (df["nsibs"] - 1)
+    centromere_dict = (
+        centromere_df.groupby("chrom").agg({"start": "min", "end": "max"}).to_dict()
+    )
+    centromere_dists = np.zeros(df.shape[0])
+    for i, (chrom, pos) in tqdm(enumerate(zip(df.chrom.values, df.avg_pos.values))):
+        centromere_dists[i] = centromere_dist(
+            chrom, pos, centromere_dict=centromere_dict, size_dict=None
+        )
+    df["centromere_dist"] = centromere_dists < window_size
+    telomere_dict = (
+        telomere_df.groupby("chrom").agg({"start": "min", "end": "max"}).to_dict()
+    )
+    telomere_dists = np.zeros(df.shape[0])
+    for i, (chrom, pos) in tqdm(enumerate(zip(df.chrom.values, df.avg_pos.values))):
+        telomere_dists[i] = telomere_dist(
+            chrom, pos, telomere_dict=telomere_dict, size_dict=None
+        )
+    df["telomere_dist"] = telomere_dists < window_size
+    filt_df = (
+        df[df["frac_siblings"] > frac_siblings]
+        .groupby(["mother", "father", "child", "chrom", "crossover_sex"])
+        .agg({"centromere_dist": "min"})
+        .reset_index()
+        .groupby(["mother", "father", "crossover_sex"])
+        .agg({"centromere_dist": "mean"})
+        .reset_index()
+    )
+    mother_df = filt_df[filt_df.crossover_sex == "maternal"][
+        ["mother", "mother", "centromere_dist"]
+    ]
+    mother_df.columns = ["FID", "IID", "DistalCrossover"]
+    father_df = filt_df[filt_df.crossover_sex == "paternal"][
+        ["father", "father", "centromere_dist"]
+    ]
+    father_df.columns = ["FID", "IID", "DistalCrossover"]
+    tot_df = pd.concat([mother_df, father_df])
+    return tot_df
 
 
 def avg_dist_centromere(df, centromere_df, chromsize_df, frac_siblings=0.5):
