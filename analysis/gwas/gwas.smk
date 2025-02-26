@@ -34,6 +34,7 @@ phenotypes = [
     "HotspotOccupancy",
     "GcContent",
     "ReplicationTiming",
+    "DistalCrossoverProportion",
 ]
 
 
@@ -257,6 +258,7 @@ rule create_rec_location_phenotypes:
         mem_mb="8G",
     params:
         plink_format=lambda wildcards: wildcards.format == "plink2",
+        distal_window=5e6,
         gc_window=250,
     script:
         "scripts/create_rec_location_phenotypes.py"

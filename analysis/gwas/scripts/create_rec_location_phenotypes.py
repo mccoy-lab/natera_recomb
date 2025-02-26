@@ -68,7 +68,6 @@ def prop_distal_crossover(
         centromere_dists[i] = centromere_dist(
             chrom, pos, centromere_dict=centromere_dict, size_dict=None
         )
-    df["centromere_dist"] = centromere_dists < window_size
     telomere_dict = (
         telomere_df.groupby("chrom").agg({"start": "min", "end": "max"}).to_dict()
     )
@@ -77,24 +76,24 @@ def prop_distal_crossover(
         telomere_dists[i] = telomere_dist(
             chrom, pos, telomere_dict=telomere_dict, size_dict=None
         )
-    df["telomere_dist"] = telomere_dists < window_size
+    df["distal"] = (telomere_dists <= window_size) | (centromere_dists < window_size)
     filt_df = (
         df[df["frac_siblings"] > frac_siblings]
-        .groupby(["mother", "father", "child", "chrom", "crossover_sex"])
-        .agg({"centromere_dist": "min"})
+        .groupby(["mother", "father", "child", "crossover_sex"])
+        .agg({"distal": "mean"})
         .reset_index()
         .groupby(["mother", "father", "crossover_sex"])
-        .agg({"centromere_dist": "mean"})
+        .agg({"distal": "mean"})
         .reset_index()
     )
     mother_df = filt_df[filt_df.crossover_sex == "maternal"][
-        ["mother", "mother", "centromere_dist"]
+        ["mother", "mother", "distal"]
     ]
-    mother_df.columns = ["FID", "IID", "DistalCrossover"]
+    mother_df.columns = ["FID", "IID", "DistalCrossoverProportion"]
     father_df = filt_df[filt_df.crossover_sex == "paternal"][
-        ["father", "father", "centromere_dist"]
+        ["father", "father", "distal"]
     ]
-    father_df.columns = ["FID", "IID", "DistalCrossover"]
+    father_df.columns = ["FID", "IID", "DistalCrossoverProportion"]
     tot_df = pd.concat([mother_df, father_df])
     return tot_df
 
@@ -265,13 +264,22 @@ if __name__ == "__main__":
     rt_df.columns = ["chrom", "start", "end", "rt"]
     rt_df["midpt"] = (rt_df["start"] + rt_df["end"]) / 2
     chromsize_df = pd.read_csv(snakemake.input["chromsize"], sep="\t", header=None)
-    centromere_pheno_df = avg_dist_centromere(co_df, centromere_df)
-    telomere_pheno_df = avg_dist_telomere(co_df, telomere_df)
+    centromere_pheno_df = avg_dist_centromere(co_df, centromere_df, chromsize_df)
+    telomere_pheno_df = avg_dist_telomere(co_df, telomere_df, chromsize_df)
     rt_pheno_df = avg_replication_timing(co_df, rt_df)
     gc_pheno_df = avg_gc_content(
         co_df, snakemake.input["gc_content"], window=snakemake.params["gc_window"]
     )
-    data_frames = [centromere_pheno_df, telomere_pheno_df, rt_pheno_df, gc_pheno_df]
+    distal_pheno_df = prop_distal_crossover(
+        co_df, centromere_df, telomere_df, window_size=snakemake.params["distal_window"]
+    )
+    data_frames = [
+        centromere_pheno_df,
+        telomere_pheno_df,
+        rt_pheno_df,
+        gc_pheno_df,
+        distal_pheno_df,
+    ]
     merged_df = reduce(
         lambda left, right: pd.merge(left, right, on=["FID", "IID"], how="outer"),
         data_frames,
