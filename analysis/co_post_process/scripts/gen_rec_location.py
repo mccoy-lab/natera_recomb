@@ -10,17 +10,27 @@ from scipy import stats
 from scipy.interpolate import interp1d
 from tqdm import tqdm
 
+# Add in a function to look at proportion of crossovers close to telomere and report ...
 
-def centromere_dist(chrom, pos, centromere_dict, size_dict):
+
+def centromere_dist(chrom, pos, centromere_dict, size_dict=None):
     pts = np.array([centromere_dict["start"][chrom], centromere_dict["end"][chrom]])
-    dist = np.min(np.abs(pos - pts)) / size_dict[chrom]
-    return dist
+    if size_dict is None:
+        dist = np.min(np.abs(pos - pts))
+        return dist
+    else:
+        dist = np.min(np.abs(pos - pts)) / size_dict[chrom]
+        return dist
 
 
-def telomere_dist(chrom, pos, telomere_dict, size_dict):
+def telomere_dist(chrom, pos, telomere_dict, size_dict=None):
     pts = np.array([telomere_dict["start"][chrom], telomere_dict["end"][chrom]])
-    dist = np.min(np.abs(pos - pts)) / size_dict[chrom]
-    return dist
+    if size_dict is None:
+        dist = np.min(np.abs(pos - pts))
+        return dist
+    else:
+        dist = np.min(np.abs(pos - pts)) / size_dict[chrom]
+        return dist
 
 
 if __name__ == "__main__":
@@ -50,7 +60,6 @@ if __name__ == "__main__":
             separator="+",
         ).alias("uid"),
     )
-    print(crossover_df.columns)
     genmap_df = pl.read_csv(
         snakemake.input["genmap"], comment_prefix="#", separator="\t"
     )
@@ -115,6 +124,17 @@ if __name__ == "__main__":
         .alias("centromere_dist"),
         pl.struct(["chrom", "avg_pos"])
         .map_elements(
+            lambda x: centromere_dist(
+                x["chrom"],
+                x["avg_pos"],
+                centromere_dict=centromere_dict,
+                size_dict=None,
+            ),
+            return_dtype=pl.Float32,
+        )
+        .alias("centromere_dist_raw"),
+        pl.struct(["chrom", "avg_pos"])
+        .map_elements(
             lambda x: telomere_dist(
                 x["chrom"],
                 x["avg_pos"],
@@ -124,6 +144,17 @@ if __name__ == "__main__":
             return_dtype=pl.Float32,
         )
         .alias("telomere_dist"),
+        pl.struct(["chrom", "avg_pos"])
+        .map_elements(
+            lambda x: telomere_dist(
+                x["chrom"],
+                x["avg_pos"],
+                telomere_dict=telomere_dict,
+                size_dict=None,
+            ),
+            return_dtype=pl.Float32,
+        )
+        .alias("telomere_dist_raw"),
         pl.struct(["chrom"])
         .map_elements(lambda x: size_dict[x["chrom"]], return_dtype=pl.Float32)
         .alias("chrom_size"),
@@ -138,6 +169,12 @@ if __name__ == "__main__":
                 pl.col("centromere_dist").mean(),
                 pl.col("telomere_dist").mean(),
                 pl.col("chrom_size").mean(),
+                (pl.col("telomere_dist_raw") <= snakemake.params["window_size"])
+                .sum()
+                .alias("n_close_telomere"),
+                (pl.col("centromere_dist_raw") <= snakemake.params["window_size"])
+                .sum()
+                .alias("n_close_centromere"),
                 pl.col("avg_pos").count().alias("nco"),
                 pl.col("patient_age").mean(),
                 pl.col("egg_donor").first(),
@@ -154,6 +191,12 @@ if __name__ == "__main__":
             .agg(
                 pl.col("centromere_dist").mean(),
                 pl.col("telomere_dist").mean(),
+                (pl.col("telomere_dist_raw") <= snakemake.params["window_size"])
+                .sum()
+                .alias("n_close_telomere"),
+                (pl.col("centromere_dist_raw") <= snakemake.params["window_size"])
+                .sum()
+                .alias("n_close_centromere"),
                 pl.col("chrom_size").mean(),
                 pl.col("avg_pos").count().alias("nco"),
                 pl.col("patient_age").mean(),
@@ -182,6 +225,12 @@ if __name__ == "__main__":
             .agg(
                 pl.col("centromere_dist").mean(),
                 pl.col("telomere_dist").mean(),
+                (pl.col("telomere_dist_raw") <= snakemake.params["window_size"])
+                .sum()
+                .alias("n_close_telomere"),
+                (pl.col("centromere_dist_raw") <= snakemake.params["window_size"])
+                .sum()
+                .alias("n_close_centromere"),
                 pl.col("chrom_size").mean(),
                 pl.col("avg_pos").count().alias("nco"),
                 pl.col("partner_age").mean(),
@@ -199,6 +248,12 @@ if __name__ == "__main__":
             .agg(
                 pl.col("centromere_dist").mean(),
                 pl.col("telomere_dist").mean(),
+                (pl.col("telomere_dist") <= snakemake.params["window_size"])
+                .sum()
+                .alias("n_close_telomere"),
+                (pl.col("centromere_dist") <= snakemake.params["window_size"])
+                .sum()
+                .alias("n_close_centromere"),
                 pl.col("chrom_size").mean(),
                 pl.col("avg_pos").count().alias("nco"),
                 pl.col("partner_age").mean(),
