@@ -67,10 +67,6 @@ if __name__ == "__main__":
         hmm.karyotypes = np.array(["3p", "3p", "3p", "3p", "3p", "3p"], dtype=str)
     else:
         raise ValueError("Chromosome is not determined to be a trisomy!")
-    pi0_est, sigma_est = hmm.est_sigma_pi0(
-        bafs=bafs, pos=pos, mat_haps=mat_haps, pat_haps=pat_haps
-    )
-    # NOTE: should we do a viterbi here instead?
     gammas, states, karyotypes = hmm.forward_backward(
         bafs=bafs,
         pos=pos,
