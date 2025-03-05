@@ -67,7 +67,7 @@ rule isolate_trisomies:
         aneu_df = pl.read_csv(
             input.aneuploidy_calls, separator="\t", null_values=["NA"]
         )
-        trisomy_df = aneu_df.filter(
+        trisomy_df = aneu_df.filter(~pl.col("embryo_noise_3sd")).filter(
             (pl.col("3m") > params["ppThresh"]) | (pl.col("3p") > params["ppThresh"])
         )
         trisomy_df[
@@ -102,6 +102,6 @@ rule est_crossover_trisomic_chrom_trio:
         trisomy_recomb="results/natera_inference_trisomy/{mother}+{father}+{child}.{chrom}.est_recomb_trisomy.tsv",
     params:
         penalty=100,
-        width=500,
+        min_size=500,
     script:
         "scripts/sibling_co_trisomy.py"
