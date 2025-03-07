@@ -52,6 +52,7 @@ if __name__ == "__main__":
         e_baf_i = (dosages[0, :] * 0 + dosages[1, :] * 1 + dosages[2, :] * 2.0) / 2.0
         expected_baf.append(e_baf_i)
     recomb_est.add_baf(embryo_bafs=expected_baf)
+    expected_baf = []
     for i in range(nsibs):
         dosages = hmm.genotype_embryo(
             bafs=baf_data[f"baf_embryo{i}"],
@@ -68,22 +69,22 @@ if __name__ == "__main__":
     for i in range(nsibs):
         # Isolate the recombinations here ...
         mat_rec, mat_rec_support = recomb_est.estimate_crossovers(
-            template_embryo=i, maternal=True
+            template_embryo=i, maternal=True,
         )
         pat_rec, pat_rec_support = recomb_est.estimate_crossovers(
             template_embryo=i, maternal=False
         )
         # Isolate the recombinations using the true haplotypes here ...
-        mat_rec_true, mat_rec_support = recomb_est.estimate_crossovers(
+        mat_rec_true, mat_rec_support = recomb_est_true.estimate_crossovers(
             template_embryo=i, maternal=True
         )
-        pat_rec_true, pat_rec_support = recomb_est.estimate_crossovers(
+        pat_rec_true, pat_rec_support = recomb_est_true.estimate_crossovers(
             template_embryo=i, maternal=False
         )
         res_dict[f"mat_rec{i}"] = mat_rec
         res_dict[f"pat_rec{i}"] = pat_rec
-        res_dict[f"mat_rec_truehap{i}"] = mat_rec
-        res_dict[f"pat_rec_truehap{i}"] = pat_rec
+        res_dict[f"mat_rec_truehap{i}"] = mat_rec_true
+        res_dict[f"pat_rec_truehap{i}"] = pat_rec_true
 
         res_dict[f"mat_rec_support{i}"] = mat_rec_support
         res_dict[f"pat_rec_support{i}"] = pat_rec_support

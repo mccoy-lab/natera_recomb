@@ -1,0 +1,13 @@
+name: susieR
+channels:
+  - defaults
+  - conda-forge
+  - bioconda
+dependencies:
+  - r-data.table
+  - r-susier
+  - r-rfast
+  - r-glue
+  - r-dplyr
+  - plink
+  - plink2

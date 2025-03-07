@@ -14,5 +14,7 @@ if __name__ == "__main__":
         .dropna()
         .astype(int)
     )
-    fname = f"results/{snakemake.wildcards['sex']}_genmap/{snakemake.wildcards['name']}.events.{snakemake.wildcards['chrom']}.{snakemake.wildcards['sex']}.txt"
-    sex_spec_co_chrom_df.to_csv(fname, index=None, header=None, sep="\t")
+    # fname = f"results/{snakemake.wildcards['sex']}_genmap/{snakemake.wildcards['name']}.events.{snakemake.wildcards['chrom']}.{snakemake.wildcards['sex']}.txt"
+    sex_spec_co_chrom_df.to_csv(
+        snakemake.output["events"], index=None, header=None, sep="\t"
+    )

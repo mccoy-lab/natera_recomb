@@ -5,10 +5,8 @@ import pandas as pd
 import re
 
 if __name__ == "__main__":
-    x = Path(snakemake.input["sumstats"])
-    spltname = re.split("\_|\.", x.name)
-    sex = spltname[3]
-    pheno = spltname[5]
+    sex = snakemake.params["sex"]
+    pheno = snakemake.params["pheno"]
     df = pd.read_csv(snakemake.input["sumstats"], header=None, sep="\t")
     df.columns = [
         "CHROM",

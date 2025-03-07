@@ -38,5 +38,6 @@ if __name__ == "__main__":
         use_raw=snakemake.params["use_raw"],
     )
     region_chrom_df["nbmeioses"] = nmeioses
-    fname = f"results/{snakemake.wildcards['sex']}_genmap/{snakemake.wildcards['name']}.nbmeioses.{snakemake.wildcards['chrom']}.{snakemake.wildcards['sex']}.{snakemake.wildcards['raw']}.txt"
-    region_chrom_df.to_csv(fname, index=None, header=None, sep="\t")
+    region_chrom_df.to_csv(
+        snakemake.output["nbmeioses"], index=None, header=None, sep="\t"
+    )

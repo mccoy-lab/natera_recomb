@@ -9,7 +9,7 @@ from io import StringIO
 
 
 # ---- Parameters for inference in Natera Data ---- #
-configfile: "config.yaml"
+# configfile: "config.yaml"
 
 
 # Create the VCF data dictionary for each chromosome ...
@@ -34,6 +34,7 @@ phenotypes = [
     "HotspotOccupancy",
     "GcContent",
     "ReplicationTiming",
+    "DistalCrossoverProportion",
 ]
 
 
@@ -49,14 +50,14 @@ rule all:
             format=["plink2", "regenie"],
             project_name=config["project_name"],
         ),
-        expand(
-            "results/h2/h2sq_ldms/h2_est_total/{project_name}.total.hsq",
-            project_name=config["project_name"],
-        ),
-        expand(
-            "results/h2/h2sq_chrom/h2_est_total/{project_name}.total.hsq",
-            project_name=config["project_name"],
-        ),
+        # expand(
+        # "results/h2/h2sq_ldms/h2_est_total/{project_name}.total.hsq",
+        # project_name=config["project_name"],
+        # ),
+        # expand(
+        # "results/h2/h2sq_chrom/h2_est_total/{project_name}.total.hsq",
+        # project_name=config["project_name"],
+        # ),
 
 
 # ------- 0. Preprocess Genetic data ------- #
@@ -80,7 +81,7 @@ rule vcf2pgen:
     shell:
         """
         plink2 --vcf {input.vcf_file} --double-id \
-        --max-alleles 2 --maf 0.005 --memory 9000\
+        --max-alleles 2 --maf 0.005 --mac 1 --memory 9000\
         --threads {threads} --make-pgen --lax-chrx-import --out {params.outfix} 
         """
 
@@ -249,6 +250,7 @@ rule create_rec_location_phenotypes:
         telomeres=config["bed_files"]["telomeres"],
         replication_timing=config["bed_files"]["replication_timing"],
         gc_content=config["bed_files"]["gc_content"],
+        chromsize=config["bed_files"]["chromsize"],
     output:
         pheno="results/phenotypes/{project_name}.{format}.location.pheno",
     resources:
@@ -256,6 +258,7 @@ rule create_rec_location_phenotypes:
         mem_mb="8G",
     params:
         plink_format=lambda wildcards: wildcards.format == "plink2",
+        distal_window=5e6,
         gc_window=250,
     script:
         "scripts/create_rec_location_phenotypes.py"
@@ -382,7 +385,7 @@ rule regenie_step1:
         outfix=lambda wildcards: f"results/gwas_output/regenie/predictions/{wildcards.project_name}_{wildcards.sex}_{wildcards.format}",
     shell:
         """
-        plink2 --pfile results/pgen_input/{wildcards.project_name} --threads {threads} --maf 0.005 --memory 9000 --indep-pairwise 200 25 0.4 --out {params.outfix}
+        plink2 --pfile results/pgen_input/{wildcards.project_name} --threads {threads} --autosome --maf 0.005 --mac 5 --memory 9000 --indep-pairwise 200 25 0.4 --out {params.outfix}
         regenie --step 1 --pgen results/pgen_input/{wildcards.project_name} --extract {output.include_snps} --covarFile {input.covar} --phenoFile {input.pheno} --remove {input.sex_exclusion} --bsize 200 --apply-rint --print-prs --threads {threads} --lowmem --lowmem-prefix tmp_rg --out {params.outfix}
         """
 
@@ -487,6 +490,7 @@ rule plink_clumping:
         pgen="results/pgen_input/{project_name}.pgen",
         psam="results/pgen_input/{project_name}.psam",
         pvar="results/pgen_input/{project_name}.pvar",
+        sex_exclusion="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
         gwas_results="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
     output:
         "results/gwas_output/{format}/clumped/{project_name}_{sex}_{format}.{pheno}.clumps",
@@ -598,6 +602,9 @@ rule combine_gwas_effect_size_afreq:
     resources:
         time="1:00:00",
         mem_mb="8G",
+    params:
+        pheno=lambda wildcards: f"{wildcards.pheno}",
+        sex=lambda wildcards: f"{wildcards.sex}",
     script:
         "scripts/combine_freq_clump_plink.py"
 
@@ -658,6 +665,64 @@ rule add_rsids:
         tabix -R {output.temp_regions} {input.dbsnp} | awk \'NR == 1 {{print \"ID\tRSID\"}} {{split($5, a, \",\"); for (x in a) {{print \"chr\"$1\":\"$2\":\"$4\":\"a[x]\"\t\"$3}}}}\' > {output.temp_rsids}
         awk \'FNR == NR {{a[$1] = $2; next}} {{print $0\"\t\"a[$2]}}\' {output.temp_rsids} {input.sumstats_replication} > {output.sumstats_rsids}
         """
+
+
+# -------- 4b. Fine-mapping GWAS loci using SuSiE ----------- #
+rule susie_gwas_loci:
+    input:
+        pgen=rules.merge_full_pgen.output.pgen,
+        psam=rules.merge_full_pgen.output.psam,
+        pvar=rules.merge_full_pgen.output.pvar,
+        raw_sumstats="results/gwas_output/{format}/{project_name}_{sex}_{format}.{pheno}.glm.linear",
+        sex_exclude="results/covariates/{project_name}.{sex}.{format}.exclude.txt",
+        locus_sumstats=rules.add_rsids.output.sumstats_rsids,
+    output:
+        finemapped_sumstats="results/gwas_output/{format}/finemapped/{project_name}_{sex}_{format}.{pheno}.sumstats.finemapped.susie.tsv",
+    conda:
+        "envs/susie.yaml"
+    threads: 12
+    script:
+        "scripts/susie_finemap.R"
+
+
+rule collect_finemapping:
+    """Test routine to collect finemapping results."""
+    input:
+        tsvs=expand(
+            "results/gwas_output/{{format}}/finemapped/{project_name}_{sex}_{{format}}.{pheno}.sumstats.finemapped.susie.tsv",
+            project_name=config["project_name"],
+            sex=["Male", "Female", "Joint"],
+            pheno=[
+                "MeanCO",
+                "CentromereDist",
+                "HotspotOccupancy",
+                "GcContent",
+                "ReplicationTiming",
+            ],
+        ),
+    output:
+        tsv="results/gwas_output/{format}/finemapped/{project_name}_{format}_total.sumstats.finemapped.susie.tsv",
+    run:
+        import polars as pl
+
+        tot_df = pl.concat(
+            [
+                pl.scan_csv(f, separator="\t", null_values=["NA"], ignore_errors=True)
+                for f in input.tsvs
+            ],
+            how="diagonal",
+        ).collect(streaming=True)
+        tot_df.write_csv(output.tsv, separator="\t", null_value="NA")
+
+
+rule total_finemapping:
+    """Finalization of finemapping results."""
+    input:
+        expand(
+            "results/gwas_output/{format}/finemapped/{project_name}_{format}_total.sumstats.finemapped.susie.tsv",
+            format=["regenie", "plink2"],
+            project_name=config["project_name"],
+        ),
 
 
 # -------- 5. Estimating per-chromosome h2 using GREML -------- #

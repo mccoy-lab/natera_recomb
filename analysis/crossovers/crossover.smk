@@ -106,7 +106,7 @@ if Path("results/natera_inference_trisomy/valid_trisomies.tsv").is_file():
     with open("results/natera_inference_trisomy/valid_trisomies.tsv", "r") as fp:
         for i, line in enumerate(fp):
             if i > 0:
-                [m, f, c, chrom] = line.rstrip().split()
+                [m, f, c, chrom, _] = line.rstrip().split()
                 total_trisomy_data.append(
                     f"results/natera_inference_trisomy/{m}+{f}+{c}.{chrom}.est_recomb_trisomy.tsv"
                 )
@@ -285,11 +285,14 @@ rule isolate_trisomies:
     run:
         aneu_df = pd.read_csv(input.aneuploidy_calls, sep="\t")
         trisomy_df = aneu_df[
-            (aneu_df["post_max"] > params["ppThresh"])
+            (
+                (aneu_df["3m"] > params["ppThresh"])
+                | (aneu_df["3p"] > params["ppThresh"])
+            )
             & (aneu_df["bf_max_cat"].isin(["3m", "3p"]))
         ]
-        trisomy_df[["mother", "father", "child", "chrom", "bf_max_cat"]].to_csv(
-            snakemake.output["trisomy_calls"], index=None, sep="\t"
+        trisomy_df[["mother", "father", "child", "chrom", "bf_max_cat", "pi0_baf", "sigma_baf"]].to_csv(
+            output.trisomy_calls, index=None, sep="\t"
         )
 
 

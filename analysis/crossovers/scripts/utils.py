@@ -93,7 +93,7 @@ def est_genotype_quality(hmm_data, names, chrom="chr21"):
             cur_posterior_disomy = g[np.where(karyo == "2")[0], np.isin(cur_pos, pos)]
             posterior_disomy_agg.append(cur_posterior_disomy)
     posterior_disomy_ = np.vstack(posterior_disomy_agg)
-    posterior_disomy = np.mean(posterior_disomy_, axis=0)
+    posterior_disomy = np.min(posterior_disomy_, axis=0)
     assert posterior_disomy.size == pos.size
     return posterior_disomy, pos
 

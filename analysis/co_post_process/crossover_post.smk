@@ -22,11 +22,14 @@ rule all:
             name=config["crossover_data"].keys(),
             recmap=config["recomb_maps"].keys(),
         ),
-        # expand(
-        #     "results/statistical_models/{name}.{recmap}.aneuploidy_effect_per_chrom.mean.tsv",
-        #     name=config["crossover_data"].keys(),
-        #     recmap=config["recomb_maps"].keys(),
-        # ),
+        expand(
+            "results/{name}.crossover_filt.{recmap}.{datatype}.{sex}.{euploid}.csv.gz",
+            name=config["crossover_data"].keys(),
+            recmap=config["recomb_maps"].keys(),
+            sex=["maternal", "paternal"],
+            euploid=["euploid", "aneuploid"],
+            datatype=["crossover_count", "hotspot_occupy", "centromere_telomere_dist"],
+        ),
 
 
 # ---------------- Analysis 1a. Conduct preprocessing analyses. -------- #
@@ -96,7 +99,7 @@ rule interpolate_co_locations:
     script:
         "scripts/interp_recmap.py"
 
-        
+
 rule intersect_w_metadata:
     """Intersect the crossover data with the resulting metadata."""
     input:
@@ -108,6 +111,7 @@ rule intersect_w_metadata:
         co_meta_map_tsv="results/{name}.crossover_filt.{recmap}.{ploid}_only.meta.tsv.gz",
     run:
         import pandas as pd
+
         meta_df = pd.read_csv(input.meta_csv)
         meta_df["egg_donor_bool"] = meta_df.egg_donor == "yes"
         meta_df["sperm_donor_bool"] = meta_df.sperm_donor == "yes"
@@ -153,83 +157,83 @@ rule merge_euploid_aneuploid:
         merged_df.to_csv(output.merged_tsv, sep="\t", index=None)
 
 
-rule estimate_chrom_specific_aneuploidy_effect:
-    """Estimate the effects of multiple linear models."""
+rule estimate_crossover_counts:
     input:
-        merged_tsv="results/{name}.crossover_filt.{recmap}.merged.meta.tsv.gz",
+        crossover_fp=rules.merge_euploid_aneuploid.output.merged_tsv,
+        aneuploidy_tsv=config["aneuploidy_data"],
+        genmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
+        covariates=config["covariates"],
     output:
-        mean_per_chrom_effects="results/statistical_models/{name}.{recmap}.aneuploidy_effect_per_chrom.mean.tsv",
-        var_per_chrom_effects="results/statistical_models/{name}.{recmap}.aneuploidy_effect_per_chrom.var.tsv",
-    shell:
-        """
-        Rscript --vanilla scripts/aneuploidy_effect_per_chrom.R {input.merged_tsv} {output.mean_per_chrom_effects} {output.var_per_chrom_effects}
-        """
-
-
-# ------- Analysis 2. Estimate Crossover Interference Stratified by Age & Sex -------- #
-rule age_sex_stratified_co_interference:
-    input:
-        co_meta_map_tsv="results/{name}.crossover_filt.{recmap}.{ploid}_only.meta.tsv.gz",
-        recmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
-    output:
-        age_sex_interference="results/xo_interference/{name}.age_xo_interference.{recmap}.{chrom}.tsv",
-    params:
-        nbins=10,
-        nboots=5,
-        seed=42,
-    script:
-        "scripts/est_age_strat_xo.py"
-
-
-# ------- Analysis 3. Posterior estimates of CO-interference across individuals. ------- #
-
-
-# ------- Analysis 4. Estimation of sex-specific recombination maps from crossover data ------ #
-rule split_sex_specific_co_data:
-    """Splits crossovers into maternal/paternal events."""
-    input:
-        co_map="results/{name}.crossover_filt.tsv.gz",
-    output:
-        "results/{sex}_genmap/{name}.events.{chrom}.{sex}.txt",
+        maternal_co_count="results/{name}.crossover_filt.{recmap}.crossover_count.maternal.{euploid}.csv.gz",
+        paternal_co_count="results/{name}.crossover_filt.{recmap}.crossover_count.paternal.{euploid}.csv.gz",
     wildcard_constraints:
-        sex="maternal|paternal",
+        euploid="euploid|aneuploid",
     params:
-        sex=lambda wildcards: wildcards.sex,
+        euploid=lambda wildcards: wildcards.euploid == "euploid",
     script:
-        "scripts/gen_events.py"
+        "scripts/gen_co_counts.py"
 
 
-rule setup_intervals_co_data:
-    """Setup intervals on which to estimate recombination rates."""
+rule estimate_centromere_telomere_dist:
     input:
-        co_map="results/{name}.crossover_filt.tsv.gz",
+        crossover_fp=rules.merge_euploid_aneuploid.output.merged_tsv,
+        aneuploidy_tsv=config["aneuploidy_data"],
+        genmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
+        covariates=config["covariates"],
+        centromeres=config["centromeres"],
+        telomeres=config["telomeres"],
+        chromsize=config["chromsize"],
     output:
-        "results/{sex}_genmap/{name}.nbmeioses.{chrom}.{sex}.{raw}.txt",
+        maternal_co_dist="results/{name}.crossover_filt.{recmap}.centromere_telomere_dist.maternal.{euploid}.csv.gz",
+        paternal_co_dist="results/{name}.crossover_filt.{recmap}.centromere_telomere_dist.paternal.{euploid}.csv.gz",
     wildcard_constraints:
-        sex="maternal|paternal",
-        raw="raw|split",
+        euploid="euploid|aneuploid",
     params:
-        sex=lambda wildcards: wildcards.sex,
-        nsplit=5,
-        use_raw=lambda wildcards: wildcards.raw == "raw",
+        euploid=lambda wildcards: wildcards.euploid == "euploid",
     script:
-        "scripts/gen_nbmeioses.py"
+        "scripts/gen_rec_location.py"
 
 
-rule est_recomb_rate_rmcmc:
+rule create_sex_specific_hotspots:
+    """Create sex-specific hotspot files from Haldorsson et al 2019."""
     input:
-        events_file="results/{sex}_genmap/{name}.events.{chrom}.{sex}.txt",
-        nbmeioses_file="results/{sex}_genmap/{name}.nbmeioses.{chrom}.{sex}.{raw}.txt",
-        rMCMC="./rMCMC/rMCMC/rMCMC",
+        genmap=lambda wildcards: config["hotspots"][wildcards.sex],
     output:
-        rates_out="results/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-rates.txt",
-        events_out="results/{sex}_genmap/{name}.{chrom}.{sex}.{raw}-events.txt",
+        hotspots="results/hotspots/{name}.{sex}.hotspots.tsv",
+    wildcard_constraints:
+        sex="Male|Female",
     params:
-        outfix=lambda wildcards: f"results/{wildcards.sex}_genmap/{wildcards.name}.{wildcards.chrom}.{wildcards.sex}.{wildcards.raw}",
-        nmeioses=lambda wildcards: pd.read_csv(
-            f"results/{wildcards.sex}_genmap/{wildcards.name}.nbmeioses.{wildcards.chrom}.{wildcards.sex}.{wildcards.raw}.txt",
-            nrows=1,
-            sep="\s",
-        ).values[:, 2][0],
-    shell:
-        "{input.rMCMC} -i {input.events_file} -nbmeioses {input.nbmeioses_file} -m {params.nmeioses} -o {params.outfix}"
+        srr=10,
+    resources:
+        time="1:00:00",
+        mem_mb="8G",
+    run:
+        df = pd.read_csv(input.genmap, sep="\t", comment="#")
+        df["SRR"] = df.cMperMb / df.cMperMb.mean()
+        filt_df = df[df.SRR > params.srr]
+        filt_df.rename(
+            columns={"Chr": "chrom", "Begin": "start", "End": "end"}, inplace=True
+        )
+        filt_df.to_csv(output.hotspots, index=None, sep="\t")
+
+
+rule estimate_hotspot_occupancy:
+    input:
+        crossover_fp=rules.merge_euploid_aneuploid.output.merged_tsv,
+        male_hotspots="results/hotspots/{name}.Male.hotspots.tsv",
+        female_hotspots="results/hotspots/{name}.Female.hotspots.tsv",
+        aneuploidy_tsv=config["aneuploidy_data"],
+        genmap=lambda wildcards: config["recomb_maps"][wildcards.recmap],
+        covariates=config["covariates"],
+    output:
+        maternal_occupancy="results/{name}.crossover_filt.{recmap}.hotspot_occupy.maternal.{euploid}.csv.gz",
+        paternal_occupancy="results/{name}.crossover_filt.{recmap}.hotspot_occupy.paternal.{euploid}.csv.gz",
+    wildcard_constraints:
+        euploid="euploid|aneuploid",
+    params:
+        euploid=lambda wildcards: wildcards.euploid == "euploid",
+        max_interval=50e3,
+        nreps=100,
+        ngridpts=300,
+    script:
+        "scripts/gen_hotspot_occupancy.py"

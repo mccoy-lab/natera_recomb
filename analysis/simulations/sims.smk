@@ -95,6 +95,7 @@ rule estimate_co:
 rule concat_true_inferred:
     """Create a table which contatenates the true and inferred results."""
     input:
+        baf="results/sims/sim_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.phase_correct.npz",
         infer_co="results/sims/inferhmm_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.corr{corr}.npz",
         true_co="results/sims/true_co_{rep}.pi0_{pi0}.std_{std}.m{m}.phase_err{p}.{nsibs}.npz",
     output:
@@ -121,9 +122,12 @@ rule concat_true_inferred:
         phase_err = int(wildcards.p) / 1000
         r_hat = filt_infer_data["r"]
         corr = int(wildcards.corr) == 1
+        baf_fp = Path(input.baf).resolve()
+        infer_co_fp = Path(input.infer_co).resolve()
+        true_co_fp= Path(input.true_co).resolve()
         with open(output.co_tsv, "w+") as out:
             out.write(
-                "rep\tpi0\tsigma\tm\tphase_err\tcorrected\tnsibs\tsib_index\tr_hat\tpi0_sib\tsigma_sib\ttrue_co_mat\tinf_co_mat\tinf_co_mat_truehap\ttrue_co_pat\tinf_co_pat\tinf_co_pat_truehap\n"
+                "rep\tpi0\tsigma\tm\tphase_err\tcorrected\tnsibs\tsib_index\tr_hat\tpi0_sib\tsigma_sib\ttrue_co_mat\tinf_co_mat\tinf_co_mat_truehap\ttrue_co_pat\tinf_co_pat\tinf_co_pat_truehap\tbaf_fp\tinfer_co_fp\ttrue_co_fp\n"
             )
             i = 0
             cos_pos_mat = ",".join(
@@ -147,7 +151,7 @@ rule concat_true_inferred:
             pi0_sib = np.mean(filt_infer_data[f"pi0_{i}"])
             sigma_sib = np.mean(filt_infer_data[f"sigma_{i}"])
             out.write(
-                f"{rep}\t{pi0}\t{std}\t{m}\t{phase_err}\t{corr}\t{nsibs}\t{i}\t{r_hat}\t{pi0_sib}\t{sigma_sib}\t{cos_pos_mat}\t{mat_rec_filt}\t{mat_rec_truehap}\t{cos_pos_pat}\t{pat_rec_filt}\t{pat_rec_truehap}\n"
+                f"{rep}\t{pi0}\t{std}\t{m}\t{phase_err}\t{corr}\t{nsibs}\t{i}\t{r_hat}\t{pi0_sib}\t{sigma_sib}\t{cos_pos_mat}\t{mat_rec_filt}\t{mat_rec_truehap}\t{cos_pos_pat}\t{pat_rec_filt}\t{pat_rec_truehap}\t{baf_fp}\t{infer_co_fp}\t{true_co_fp}\n"
             )
 
 

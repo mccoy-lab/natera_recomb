@@ -1,0 +1,8 @@
+metadata: "../../data/spectrum_metadata_merged.csv"
+crossover_callset:
+  merged_q90_sib_qual: '../co_post_process/results/v30b_heuristic_90_nsib_qual.crossover_filt.deCode_haldorsson19.merged.meta.tsv.gz'
+  euploid_q90_sib_qual: '../co_post_process/results/v30b_heuristic_90_nsib_qual.crossover_filt.deCode_haldorsson19.euploid_only.meta.tsv.gz'
+  aneuploid_q90_sib_qual: '../co_post_process/results/v30b_heuristic_90_nsib_qual.crossover_filt.deCode_haldorsson19.aneuploid_only.meta.tsv.gz'
+  merged_q95_sib_qual: '../co_post_process/results/v30b_heuristic_95_nsib_qual.crossover_filt.deCode_haldorsson19.merged.meta.tsv.gz'
+  euploid_q95_sib_qual: '../co_post_process/results/v30b_heuristic_95_nsib_qual.crossover_filt.deCode_haldorsson19.euploid_only.meta.tsv.gz'
+  aneuploid_q95_sib_qual: '../co_post_process/results/v30b_heuristic_95_nsib_qual.crossover_filt.deCode_haldorsson19.aneuploid_only.meta.tsv.gz'
