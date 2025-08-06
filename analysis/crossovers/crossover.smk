@@ -302,6 +302,9 @@ rule est_crossover_trisomic_chrom_trio:
         trisomy_calls="results/natera_inference_trisomy/valid_trisomies.tsv",
         baf_pkl=lambda wildcards: f"{base_path}/{wildcards.mother}+{wildcards.father}/{wildcards.child}.bafs.pkl.gz",
     output:
-        "results/natera_inference_trisomy/{mother}+{father}+{child}.{chrom}.est_recomb_trisomy.tsv",
+        trisomy_recomb = "results/natera_inference_trisomy/{mother}+{father}+{child}.{chrom}.est_recomb_trisomy.tsv",
+    params:
+        penalty=100,
+        width=500,
     script:
         "scripts/sibling_co_trisomy.py"

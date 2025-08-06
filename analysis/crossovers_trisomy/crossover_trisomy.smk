@@ -13,8 +13,8 @@ metadata_file = "../../data/spectrum_metadata_merged.csv"
 aneuploidy_calls = "/data/rmccoy22/natera_spectrum/karyohmm_outputs/compiled_output/natera_embryos.karyohmm_v30a.bph_sph_trisomy.full_annotation.031624.tsv.gz"
 
 total_trisomy_data = []
-if Path("results/natera_inference_trisomy/valid_trisomies.tsv").is_file():
-    with open("results/natera_inference_trisomy/valid_trisomies.tsv", "r") as fp:
+if Path("results/natera_inference_trisomy/valid_trisomies.filt.tsv").is_file():
+    with open("results/natera_inference_trisomy/valid_trisomies.filt.tsv", "r") as fp:
         for i, line in enumerate(fp):
             if i > 0:
                 [m, f, c, chrom, _, _, _, _] = line.rstrip().split()
@@ -26,12 +26,11 @@ if Path("results/natera_inference_trisomy/valid_trisomies.tsv").is_file():
 # ------- Rules Section ------- #
 localrules:
     all,
-    filter_putative_euploid_triplets,
 
 
 rule all:
     input:
-        "results/natera_inference_trisomy/valid_trisomies.tsv",
+        "results/natera_inference_trisomy/valid_trisomies.filt.tsv",
         total_trisomy_data,
 
 
@@ -83,11 +82,59 @@ rule isolate_trisomies:
             ]
         ].write_csv(output.trisomy_calls, null_value="NA", separator="\t")
 
+rule filter_trisomy_calls:
+    input:
+        trisomy_calls="results/natera_inference_trisomy/valid_trisomies.tsv",
+    output:
+        filt_trisomy_calls="results/natera_inference_trisomy/valid_trisomies.filt.tsv",
+    run:
+        import polars as pl
+        from pathlib import Path
+        from tqdm import tqdm
+
+        trisomy_df = pl.read_csv(
+            input.trisomy_calls, separator="\t", null_values=["NA"]
+        )
+        unique_trisomy_df = trisomy_df.unique(["mother", "father", "child"])[
+            "mother", "father", "child"
+        ]
+        filt = np.zeros(unique_trisomy_df.shape[0], dtype=bool)
+        i = 0
+        for mother, father, child in tqdm(
+            zip(
+                unique_trisomy_df["mother"].to_numpy(),
+                unique_trisomy_df["father"].to_numpy(),
+                unique_trisomy_df["child"].to_numpy(),
+            )
+        ):
+            hmm_fp = define_hmm(mother_id=mother, father_id=father, child_id=child)
+            baf_fp = define_baf(mother_id=mother, father_id=father, child_id=child)
+            filt[i] = Path(hmm_fp).exists() & Path(baf_fp).exists()
+            i += 1
+        unique_trisomy_df = unique_trisomy_df.with_columns(
+            pl.Series(filt).alias("file_exists")
+        )
+        trisomy_df = trisomy_df.join(
+            unique_trisomy_df, how="inner", on=["mother", "father", "child"]
+        ).filter(pl.col("file_exists"))
+        trisomy_df[
+            [
+                "mother",
+                "father",
+                "child",
+                "chrom",
+                "bf_max_cat",
+                "pi0_baf",
+                "sigma_baf",
+                "post_max",
+            ]
+        ].write_csv(output.filt_trisomy_calls, null_value="NA", separator="\t")
+
 
 rule est_crossover_trisomic_chrom_trio:
     """Estimate crossovers using trisomy-specific path tracing."""
     input:
-        trisomy_calls="results/natera_inference_trisomy/valid_trisomies.tsv",
+        trisomy_calls="results/natera_inference_trisomy/valid_trisomies.filt.tsv",
         hmm_pkl=lambda wildcards: define_hmm(
             mother_id=wildcards.mother,
             father_id=wildcards.father,

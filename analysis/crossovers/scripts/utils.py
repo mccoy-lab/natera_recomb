@@ -1,3 +1,4 @@
+:q
 import gzip as gz
 import pickle
 import sys

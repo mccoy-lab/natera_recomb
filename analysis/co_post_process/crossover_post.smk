@@ -190,6 +190,7 @@ rule estimate_centromere_telomere_dist:
         euploid="euploid|aneuploid",
     params:
         euploid=lambda wildcards: wildcards.euploid == "euploid",
+        window_size=5e6,
     script:
         "scripts/gen_rec_location.py"
 
