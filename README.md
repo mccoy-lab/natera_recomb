@@ -1,4 +1,6 @@
-# Natera Recombination Quantitative Genetics
+# natera_recomb
+
+Identification + GWAS + QuantGen of Recombination in Natera PGT Data
 
 ## Pipelines
 
@@ -6,7 +8,7 @@ All of the pipelines are built using the `snakemake` workflow management system 
 
 1. `analysis/crossovers`
 
-This workflow identifies crossovers on disomic chromosomes across all embryos where there are at least three or more disomic sibling embryos (using the current `aneuploidy` calls - see below). 
+This workflow identifies crossovers on disomic chromosomes across all embryos where there are three or more disomic sibling embryos (using the current `aneuploidy` calls - see below). 
 
 Briefly the workflow for each chromosome operates to:
 

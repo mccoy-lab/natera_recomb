@@ -82,7 +82,6 @@ rule isolate_trisomies:
             ]
         ].write_csv(output.trisomy_calls, null_value="NA", separator="\t")
 
-
 rule filter_trisomy_calls:
     input:
         trisomy_calls="results/natera_inference_trisomy/valid_trisomies.tsv",
